@@ -1,0 +1,28 @@
+---
+description: Org context hub loading rules for chauhaidang / XQ sessions in this repo
+alwaysApply: true
+---
+
+# Org context hub
+
+This repository is `xq-context-hub`, the AI context home for org `chauhaidang`.
+
+## Always
+
+- Start from `AGENTS.md` and `CONTEXT-MAP.md`
+- Load only the domain `CONTEXT.md` needed for the current task
+- Use glossary terms from the selected domain
+- Keep org conventions from `org/conventions.md` when discussing packages,
+  secrets, or commits
+
+## Never
+
+- Preload every domain and org file into context
+- Commit secrets or tokens
+- Commit or push unless the user explicitly asks
+- Duplicate `xq-harness` engineering workflow skills into this hub
+
+## Skills
+
+- `use-context-hub` — navigate map → domain
+- `add-domain-context` — add or extend a domain
