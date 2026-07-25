@@ -35,12 +35,14 @@ Fill `PLAN.md`, then open a hub GitHub Issue that links
 Open an umbrella issue on `xq-context-hub` when the plan has:
 
 - Clear goal and non-goals
+- **Before / After**, **Test approach**, and **Test coverage** (from the template)
 - At least one target repo from `org/links.yaml`
 - Acceptance criteria
 
 Put a markdown checklist on the issue (one line per target repo). Update that
 checklist as PRs open/merge. Label `ready-for-agent` when an agent can execute
-without further clarifying questions.
+without further clarifying questions. Review after snap must check **TSR**
+(Test Summary Report under `**/tsr/`, or the plan's named equivalent).
 
 ## Agent entrypoints
 

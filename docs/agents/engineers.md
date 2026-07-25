@@ -12,20 +12,24 @@ engineer-in-<role>   →   .cursor/agents/engineer-in-<role>.md
 | `engineer-in-dev` | `dev` | **Parallel** same branch | `implement`, `tdd`, `diagnosing-bugs` |
 | `engineer-in-test` | `test` | **Parallel** same branch | `tdd`, `qa` (evidence) |
 | `engineer-in-devops` | `devops` | **Parallel** same branch | conflicts, pre-commit, CI files |
-| `engineer-in-review` | `review` | After **snap** | `code-review`, `review` |
+| `engineer-in-review` | `review` | After **snap** | `code-review`, `review`, **TSR** evidence check |
 
 Shared playbook: [`.agents/skills/engineer-in/SKILL.md`](../../.agents/skills/engineer-in/SKILL.md).  
 Parallel model: [`parallel-wave.md`](parallel-wave.md).
 
 ## Default way of work (one repo)
 
-1. Contract (product-lead ± design)
+1. Contract (product-lead ± design) — includes Before/After, Test approach,
+   Test coverage in `PLAN.md`
 2. **Parallel:** dev + test + devops on **one branch**
-3. **Snap** all slices → green
-4. review → one PR
+3. **Snap** all slices → green (prefer commands that refresh TSR when applicable)
+4. review (contract + acceptance + **TSR**) → one PR
 
 Do not serialize test-after-dev by default when a contract exists — that is the
 bottleneck this model removes.
+
+**TSR** = Test Summary Report evidence under a module's `tsr/` path (JUnit XML +
+markdown report), or the plan-named equivalent snap artifact.
 
 ## Task shape (wave)
 

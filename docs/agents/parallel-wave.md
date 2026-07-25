@@ -31,10 +31,10 @@ sequenceDiagram
 
 | Phase | Who | Output |
 | --- | --- | --- |
-| 0 Contract | `product-lead` (+ `engineer-in-design` if needed) | Work Contract in plan or issue |
+| 0 Contract | `product-lead` (+ `engineer-in-design` if needed) | Work Contract + Before/After + Test approach + Test coverage in plan |
 | 1 Parallel wave | `dev` + `test` + `devops` same `branch` | Role slices committed on that branch |
-| 2 Snap | root / `product-lead` | Green suite, one coherent branch, checklist update |
-| 3 Review | `engineer-in-review` | Merge recommendation |
+| 2 Snap | root / `product-lead` | Green suite (incl. TSR when required), one coherent branch, checklist update |
+| 3 Review | `engineer-in-review` | Merge recommendation; **TSR** / evidence checked against plan |
 | 4 Deliver | root (user-approved) | One PR per repo |
 
 ## Work Contract (required before parallel wave)
@@ -61,7 +61,12 @@ Product-lead publishes a short contract (in `PLAN.md` or hub issue comment):
 - [ ] …
 ### Snap commands
 - `<repo verify command>`
+- `<TSR path or equivalent evidence command when the plan requires it>`
 ```
+
+The plan (not only the Work Contract) must also define **Before / After**,
+**Test approach**, and **Test coverage** so test can start from seams and review
+can judge evidence. See [`plans/_templates/PLAN.md`](../../plans/_templates/PLAN.md).
 
 No parallel wave without **branch name** + **file ownership** + **acceptance**.
 
@@ -80,7 +85,8 @@ When all three report done (or waived):
 1. Ensure one branch tip contains all slices
 2. Run contract **Snap commands**
 3. Fix only integration breaks (assign a short follow-up role if needed)
-4. Then spawn `engineer-in-review` on that branch
+4. Then spawn `engineer-in-review` on that branch — review includes **TSR**
+   (Test Summary Report under `**/tsr/` or the plan's named equivalent)
 5. Open **one** PR for the repo when user allows
 
 ## Multi-repo

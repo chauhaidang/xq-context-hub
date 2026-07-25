@@ -36,12 +36,16 @@ Engineers: [`docs/agents/engineers.md`](../../../docs/agents/engineers.md).
 
 1. Map domain via `CONTEXT-MAP.md`; load only needed context.
 2. Scaffold plan from `plans/_templates/PLAN.md` when needed.
-3. For each repo delivery unit, define:
+3. Fill plan QA sections before the wave:
+   - **Before / After** — current vs desired behavior / surfaces / evidence
+   - **Test approach** — layers, seams, fixtures, environments
+   - **Test coverage** — required cases + TSR (or equivalent) evidence
+4. For each repo delivery unit, define:
    - Shared **`branch`**
    - **Work Contract** (see parallel-wave.md)
    - Wave roles: usually `dev` + `test` + `devops` in parallel
-4. If contracts/seams are unclear → `engineer-in-design` **before** the wave.
-5. Link hub issue; checklist tracks wave → snap → review → PR.
+5. If contracts/seams are unclear → `engineer-in-design` **before** the wave.
+6. Link hub issue; checklist tracks wave → snap → review (incl. **TSR**) → PR.
 
 ## Sequencing to hand root
 
@@ -68,7 +72,7 @@ PARALLEL:
   role=devops work_package=WP3 — CI           ownership=.github/**
 
 AFTER_SNAP:
-  role=review work_package=WP4 — review branch
+  role=review work_package=WP4 — review branch + TSR / evidence
 ```
 
 Repeat per target repo (repos may wave in parallel with each other).
@@ -80,6 +84,7 @@ Before review:
 - [ ] All wave roles reported done or explicitly waived
 - [ ] Single branch contains all slices
 - [ ] Contract snap commands passed
+- [ ] Plan-required **TSR** (or equivalent evidence) present / refreshed
 - [ ] Hub issue comment: wave complete → review next
 
 ## Progress (GitHub issue only)

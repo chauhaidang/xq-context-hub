@@ -43,12 +43,14 @@ Parallel model: [`docs/agents/parallel-wave.md`](../../../docs/agents/parallel-w
    acceptance).
 2. Confirm checkout; sync only if safe. Check out / create **`branch`** from the
    task (shared by dev/test/devops).
-3. Stay in ownership globs from the contract. Follow product `AGENTS.md`.
+3. Stay in ownership globs from the contract. Load product context in order:
+   `CONSUMER_CONTEXT.md` → `AGENTS.md` → `AGENT.md` (first that exists).
 4. Apply your role’s harness skills; minimal commits on **that branch only**.
 5. Run role-relevant verification (full snap suite is product-lead/root after
    the wave unless the task says otherwise).
 6. **Wave roles (`dev`/`test`/`devops`):** do **not** open the delivery PR;
-   report slice complete. **Review:** after snap; PR comments if allowed.
+   report slice complete. **Review:** after snap; check **TSR** / plan evidence;
+   PR comments if allowed.
 7. Return: branch, files touched, commands, blockers, “ready for snap: yes/no”.
 
 ## Parallel wave rules

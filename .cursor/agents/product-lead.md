@@ -20,9 +20,10 @@ Parallel model: [`docs/agents/parallel-wave.md`](../../docs/agents/parallel-wave
 ## Own
 
 - Plan + **Work Contract** (branch, ownership, acceptance, snap commands)
+- Plan QA sections: **Before / After**, **Test approach**, **Test coverage**
 - Hub issue progress
 - Parallel wave batch: same `branch` for `dev` + `test` + `devops`
-- Snap coordination; then `engineer-in-review`
+- Snap coordination; then `engineer-in-review` (incl. **TSR** evidence)
 
 ## Do not
 

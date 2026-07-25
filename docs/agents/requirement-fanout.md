@@ -4,11 +4,11 @@
 
 | Concern | Where |
 | --- | --- |
-| Spec | `plans/<NNN>-<slug>/PLAN.md` |
+| Spec | `plans/<NNN>-<slug>/PLAN.md` (incl. Before/After, Test approach, Test coverage) |
 | Work Contract | Plan section or hub issue (branch, ownership, acceptance) |
 | Progress | Hub GitHub Issue checklist |
 | Code | `checkouts/<repo>/` on the contract branch |
-| Evidence | One PR per repo after snap + review |
+| Evidence | TSR (`**/tsr/` or plan equivalent) + one PR per repo after snap + review |
 
 ## Lifecycle
 
@@ -16,7 +16,7 @@
 2. **Plan + contracts** — `product-lead` (± `engineer-in-design`)
 3. **Parallel wave** — `dev` + `test` + `devops` same branch ([`parallel-wave.md`](parallel-wave.md))
 4. **Snap** — integrate slices; run snap commands
-5. **Review** — `engineer-in-review`
+5. **Review** — `engineer-in-review` (contract + acceptance + **TSR**)
 6. **Deliver** — one PR per repo (user-approved); update issue checklist
 
 ## Hard rules
