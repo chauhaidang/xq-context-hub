@@ -1,0 +1,12 @@
+---
+description: Thin always-on rules for xq-context-hub; delegate via TEAM.md
+alwaysApply: true
+---
+
+# Org context hub
+
+- Start from `AGENTS.md` + `CONTEXT-MAP.md`; load one domain at a time
+- Orchestrate via `.cursor/TEAM.md` — prefer subagents over growing root context
+- Checkouts only under `checkouts/` (`org/links.yaml`); never commit clones
+- No secrets; no commit/push/PR unless the user asks
+- Intake → `requirement-triage`; plan/progress → `product-lead`; code → `engineer-in-<role>` (dev|test|design|review|devops)

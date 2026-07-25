@@ -1,0 +1,15 @@
+---
+description: Route product-lead implementation tasks to engineer-in-<role> subagents
+alwaysApply: false
+---
+
+# Engineer-in-\<role\>
+
+When `product-lead` assigns execution work:
+
+1. Wave roles `dev`/`test`/`devops` share one **branch** + Work Contract — spawn in parallel
+2. `design` before wave if needed; `review` only after **snap**
+3. Playbook: `.agents/skills/engineer-in/SKILL.md` + `docs/agents/parallel-wave.md`
+4. No delivery PR mid-wave
+
+Product-lead owns plan/contract/snap; engineers execute in `checkouts/`.
