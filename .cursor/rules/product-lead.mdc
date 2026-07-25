@@ -1,0 +1,18 @@
+---
+description: Delegate plan and GitHub-issue progress work to product-lead
+globs: plans/**/*
+alwaysApply: false
+---
+
+# Product lead
+
+For creating/updating `plans/**`, syncing umbrella issue checklists, or
+reporting multi-repo requirement status:
+
+1. Delegate to subagent `product-lead` (see `.cursor/TEAM.md`)
+2. Load skill `.agents/skills/product-lead/SKILL.md`
+3. Progress = hub **GitHub issue** only — never `PROGRESS.md`
+4. Publish a **Work Contract** (branch + ownership) then parallel
+   `dev`+`test`+`devops`; snap; then `review` — see `docs/agents/parallel-wave.md`
+
+New/unclear intake → `requirement-triage` first.

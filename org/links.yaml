@@ -1,0 +1,91 @@
+# Machine-readable link registry for xq-context-hub.
+# Clone targets resolve to: <hub>/${checkout_root}/<name>
+
+checkout_root: checkouts
+
+org: chauhaidang
+default_host: github.com
+
+repos:
+  xq-fitness-app:
+    url: git@github.com:chauhaidang/xq-fitness-app.git
+    domain: fitness
+    default_branch: main
+  xq-fitness-write:
+    url: git@github.com:chauhaidang/xq-fitness-write.git
+    domain: fitness
+    default_branch: main
+  xq-fitness-read:
+    url: git@github.com:chauhaidang/xq-fitness-read.git
+    domain: fitness
+    default_branch: main
+  xq-fitness-db:
+    url: git@github.com:chauhaidang/xq-fitness-db.git
+    domain: fitness
+    default_branch: main
+  xq-fitness-gate-keeper:
+    url: git@github.com:chauhaidang/xq-fitness-gate-keeper.git
+    domain: fitness
+    default_branch: main
+  xq-mobile-app:
+    url: git@github.com:chauhaidang/xq-mobile-app.git
+    domain: fitness
+    default_branch: main
+  xq-android-app:
+    url: git@github.com:chauhaidang/xq-android-app.git
+    domain: fitness
+    default_branch: main
+
+  xq-harness:
+    url: git@github.com:chauhaidang/xq-harness.git
+    domain: harness
+    default_branch: main
+  xq-versastack:
+    url: git@github.com:chauhaidang/xq-versastack.git
+    domain: harness
+    default_branch: main
+  xq-test-infra:
+    url: git@github.com:chauhaidang/xq-test-infra.git
+    domain: harness
+    default_branch: main
+  xq-stubby:
+    url: git@github.com:chauhaidang/xq-stubby.git
+    domain: harness
+    default_branch: main
+  xq-stub-server:
+    url: git@github.com:chauhaidang/xq-stub-server.git
+    domain: harness
+    default_branch: main
+  xq-toolbox:
+    url: git@github.com:chauhaidang/xq-toolbox.git
+    domain: harness
+    default_branch: main
+
+  xq-platform:
+    url: git@github.com:chauhaidang/xq-platform.git
+    domain: platform
+    default_branch: main
+  xq-platform-node:
+    url: git@github.com:chauhaidang/xq-platform-node.git
+    domain: platform
+    default_branch: main
+  xq-contracts:
+    url: git@github.com:chauhaidang/xq-contracts.git
+    domain: platform
+    default_branch: main
+  xq-plugins:
+    url: git@github.com:chauhaidang/xq-plugins.git
+    domain: platform
+    default_branch: main
+  xq-sdk-node:
+    url: git@github.com:chauhaidang/xq-sdk-node.git
+    domain: platform
+    default_branch: main
+  xq-js-common-kit:
+    url: git@github.com:chauhaidang/xq-js-common-kit.git
+    domain: platform
+    default_branch: main
+  xq-kit-common:
+    url: git@github.com:chauhaidang/xq-kit-common.git
+    domain: platform
+    default_branch: main

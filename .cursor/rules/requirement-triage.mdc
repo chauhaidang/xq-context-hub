@@ -1,0 +1,17 @@
+---
+description: When triaging new or unclear hub requirements, delegate to requirement-triage
+alwaysApply: false
+---
+
+# Requirement triage
+
+For **new/unclear** multi-repo requirements or unlabeled hub issues (intake):
+
+1. Delegate to subagent `requirement-triage` (see `.cursor/TEAM.md`)
+2. Load skill `.agents/skills/requirement-triage/SKILL.md`
+3. Do not expand root `AGENTS.md` with triage procedures
+
+After labels/`ready-for-agent`, hand **plan + progress** to `product-lead`.
+Implementation → `engineer-in-<role>` (parallel when disjoint).
+
+Labels: `bug`|`enhancement` + `needs-triage`|`needs-info`|`ready-for-agent`|`ready-for-human`|`wontfix`.
