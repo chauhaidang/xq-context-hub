@@ -1,0 +1,100 @@
+# PROTOTYPE — copy into checkouts/xq-versastack/.github/workflows/repo-meta.yml in Phase 1.
+# Not live. Root / docs / templates / CI-definition checks only. Never builds modules.
+#
+name: repo-meta
+
+on:
+  pull_request:
+    paths:
+      - "AGENTS.md"
+      - "CONSUMER_CONTEXT.md"
+      - "README.md"
+      - "LICENSE"
+      - ".gitignore"
+      - "docs/**"
+      - "templates/**"
+      - ".github/**"
+      - "scripts/changed-modules.sh"
+  push:
+    branches: [main]
+    paths:
+      - "AGENTS.md"
+      - "CONSUMER_CONTEXT.md"
+      - "README.md"
+      - "LICENSE"
+      - ".gitignore"
+      - "docs/**"
+      - "templates/**"
+      - ".github/**"
+      - "scripts/changed-modules.sh"
+  workflow_dispatch: {}
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Required root context files
+        run: |
+          set -euo pipefail
+          test -f README.md
+          test -f AGENTS.md
+          test -f CONSUMER_CONTEXT.md
+
+      - name: Scaffold directory present (once landed)
+        run: |
+          set -euo pipefail
+          # Soft-fail friendly during first CI-only PR: warn if missing, fail once contract says scaffold exists
+          if [[ ! -d templates/module ]]; then
+            echo "::warning::templates/module not present yet — expected after WP1 scaffold"
+          else
+            test -f templates/module/README.md || test -f templates/module/scripts/ci.sh || \
+              echo "::warning::templates/module exists but missing README or scripts/ci.sh"
+          fi
+
+      - name: Workflow YAML present
+        run: |
+          set -euo pipefail
+          test -f .github/workflows/module-ci.yml
+          test -f .github/workflows/repo-meta.yml
+
+      - name: Python YAML parse of workflows
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import sys, pathlib
+          try:
+              import yaml
+          except ImportError:
+              print("PyYAML not installed on runner — falling back to safe-load via json? skip deep parse")
+              # Minimal structural check: files non-empty and start with comment/name
+              for p in pathlib.Path(".github/workflows").glob("*.yml"):
+                  text = p.read_text(encoding="utf-8")
+                  assert text.strip(), p
+                  assert "on:" in text or "name:" in text, p
+              print("basic workflow text checks ok")
+              sys.exit(0)
+          root = pathlib.Path(".github/workflows")
+          for p in sorted(root.glob("*.yml")):
+              with p.open(encoding="utf-8") as f:
+                  docs = list(yaml.safe_load_all(f))
+              assert docs and docs[0] is not None, p
+              print(f"ok {p}")
+          PY
+
+      # Intentionally NO: matrix over modules/*, npm/swift at root, scripts/ci.sh orchestration
+
+  # Required check name once protection is set: "repo-meta / gate"
+  gate:
+    needs: [meta]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce repo-meta gate
+        run: |
+          set -euo pipefail
+          result="${{ needs.meta.result }}"
+          echo "meta result=$result"
+          [[ "$result" == "success" ]]

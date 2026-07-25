@@ -1,0 +1,88 @@
+# PROTOTYPE — copy into checkouts/xq-versastack/.github/workflows/module-ci.yml in Phase 1.
+# Not live. Reusable workflow only (workflow_call). No root install/build.
+#
+# Inputs:
+#   module  — directory under modules/
+#   setup   — node | swift | none
+#   command — verify entry relative to module root (default ./scripts/ci.sh)
+#
+name: module-ci
+
+on:
+  workflow_call:
+    inputs:
+      module:
+        description: Module directory name under modules/
+        required: true
+        type: string
+      setup:
+        description: Toolchain to install before verify (node | swift | none)
+        required: false
+        type: string
+        default: none
+      command:
+        description: Command to run inside the module directory
+        required: false
+        type: string
+        default: ./scripts/ci.sh
+      node-version:
+        description: Node version when setup=node
+        required: false
+        type: string
+        default: "22"
+      runner:
+        description: GitHub-hosted runner label (ubuntu-latest or macos-14 for Swift)
+        required: false
+        type: string
+        default: ubuntu-latest
+
+jobs:
+  verify:
+    runs-on: ${{ inputs.runner }}
+    defaults:
+      run:
+        working-directory: modules/${{ inputs.module }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: inputs.setup == 'node'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          # Do not cache from repo-root lockfiles — modules are independent.
+          # Optional later: cache-dependency-path: modules/${{ inputs.module }}/package-lock.json
+
+      - name: Setup Swift
+        if: inputs.setup == 'swift'
+        # Phase 1 devops: replace with pinned setup action, e.g. swift-actions/setup-swift@…
+        run: |
+          set -euo pipefail
+          echo "Prototype placeholder — install Swift for modules/${{ inputs.module }}"
+          which swift || true
+          swift --version || true
+
+      - name: Reject unknown setup
+        if: |
+          inputs.setup != 'node' &&
+          inputs.setup != 'swift' &&
+          inputs.setup != 'none'
+        run: |
+          echo "Unknown setup='${{ inputs.setup }}' (expected node|swift|none)"
+          exit 1
+
+      - name: Module verify
+        run: |
+          set -euo pipefail
+          echo "cwd=$(pwd) module=${{ inputs.module }} setup=${{ inputs.setup }}"
+          if [[ ! -f "${{ inputs.command }}" && ! -x "${{ inputs.command }}" ]]; then
+            echo "Missing verify entry: ${{ inputs.command }}"
+            exit 1
+          fi
+          # Prefer executable; fall back to bash for non-executable stubs during scaffold
+          if [[ -x "${{ inputs.command }}" ]]; then
+            "${{ inputs.command }}"
+          else
+            bash "${{ inputs.command }}"
+          fi

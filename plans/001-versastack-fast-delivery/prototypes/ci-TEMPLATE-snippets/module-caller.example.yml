@@ -1,0 +1,72 @@
+# PROTOTYPE — path-filtered caller template.
+# Copy to checkouts/xq-versastack/.github/workflows/ci-<module>.yml when a module ships.
+# Replace ALL placeholders:
+#   __MODULE__  — directory name under modules/ (e.g. hello-cli)
+#   __SETUP__   — node | swift | none
+#   __RUNNER__  — ubuntu-latest (Node/none) or macos-14 (typical Swift)
+#
+# Do NOT enable a caller in Phase 0 / this wave if no modules/<name>/ exists.
+#
+name: ci-__MODULE__
+
+on:
+  pull_request:
+    paths:
+      - "modules/__MODULE__/**"
+      - ".github/workflows/ci-__MODULE__.yml"
+      - ".github/workflows/module-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "modules/__MODULE__/**"
+      - ".github/workflows/ci-__MODULE__.yml"
+      - ".github/workflows/module-ci.yml"
+  workflow_dispatch: {}
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_ci: ${{ steps.filter.outputs.module }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            module:
+              - 'modules/__MODULE__/**'
+              - '.github/workflows/ci-__MODULE__.yml'
+              - '.github/workflows/module-ci.yml'
+
+  verify:
+    needs: changes
+    if: needs.changes.outputs.run_ci == 'true'
+    uses: ./.github/workflows/module-ci.yml
+    with:
+      module: __MODULE__
+      setup: __SETUP__
+      command: ./scripts/ci.sh
+      runner: __RUNNER__
+
+  # Branch protection required check (when module exists):
+  #   ci-__MODULE__ / gate
+  gate:
+    needs: [changes, verify]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce __MODULE__ gate
+        run: |
+          set -euo pipefail
+          if [[ "${{ needs.changes.outputs.run_ci }}" != "true" ]]; then
+            echo "No __MODULE__ paths changed — gate green (no-op)"
+            exit 0
+          fi
+          result="${{ needs.verify.result }}"
+          echo "verify result=$result"
+          if [[ "$result" == "success" ]]; then
+            exit 0
+          fi
+          # skipped/cancelled when if: false should not happen when run_ci=true
+          exit 1
