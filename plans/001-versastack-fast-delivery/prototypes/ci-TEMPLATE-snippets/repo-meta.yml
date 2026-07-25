@@ -4,17 +4,10 @@
 name: repo-meta
 
 on:
-  pull_request:
-    paths:
-      - "AGENTS.md"
-      - "CONSUMER_CONTEXT.md"
-      - "README.md"
-      - "LICENSE"
-      - ".gitignore"
-      - "docs/**"
-      - "templates/**"
-      - ".github/**"
-      - "scripts/changed-modules.sh"
+  # No pull_request.paths — if `repo-meta / gate` is required, the workflow must run every PR.
+  # Job steps are cheap (no module builds). Optional path filter can be added later via dorny
+  # + a no-op gate if minutes become a concern.
+  pull_request: {}
   push:
     branches: [main]
     paths:
@@ -43,15 +36,18 @@ jobs:
           test -f AGENTS.md
           test -f CONSUMER_CONTEXT.md
 
-      - name: Scaffold directory present (once landed)
+      - name: Scaffold + empty modules dir (layout B)
         run: |
           set -euo pipefail
-          # Soft-fail friendly during first CI-only PR: warn if missing, fail once contract says scaffold exists
+          # Soft during first CI-only PR; harden once WP1 lands layout B
           if [[ ! -d templates/module ]]; then
             echo "::warning::templates/module not present yet — expected after WP1 scaffold"
           else
             test -f templates/module/README.md || test -f templates/module/scripts/ci.sh || \
               echo "::warning::templates/module exists but missing README or scripts/ci.sh"
+          fi
+          if [[ ! -f modules/README.md ]]; then
+            echo "::warning::modules/README.md not present yet — expected with layout B"
           fi
 
       - name: Workflow YAML present

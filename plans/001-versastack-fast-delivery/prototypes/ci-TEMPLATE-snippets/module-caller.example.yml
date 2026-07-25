@@ -1,22 +1,23 @@
-# PROTOTYPE — path-filtered caller template.
+# PROTOTYPE — path-filtered caller template (job-level filters + always-green gate).
 # Copy to checkouts/xq-versastack/.github/workflows/ci-<module>.yml when a module ships.
 # Replace ALL placeholders:
 #   __MODULE__  — directory name under modules/ (e.g. hello-cli)
 #   __SETUP__   — node | swift | none
 #   __RUNNER__  — ubuntu-latest (Node/none) or macos-14 (typical Swift)
 #
+# IMPORTANT: Do NOT put `paths:` on pull_request if `gate` is a required check.
+# Missing workflows = missing required checks. Filter inside `changes` instead.
+# Optional: keep `paths:` on push:main only to save minutes when not required.
+#
 # Do NOT enable a caller in Phase 0 / this wave if no modules/<name>/ exists.
 #
 name: ci-__MODULE__
 
 on:
-  pull_request:
-    paths:
-      - "modules/__MODULE__/**"
-      - ".github/workflows/ci-__MODULE__.yml"
-      - ".github/workflows/module-ci.yml"
+  pull_request: {}
   push:
     branches: [main]
+    # Optional savings on main; safe because main protection often differs from PR rules.
     paths:
       - "modules/__MODULE__/**"
       - ".github/workflows/ci-__MODULE__.yml"

@@ -92,21 +92,19 @@ jobs:
 
 ## 2. Path-filtered caller + gate job
 
-One file per shipped module. Example for a future `modules/hello-cli/` (not created this wave):
+One file per shipped module. Example for a future `modules/hello-cli/` (not created this wave).
+
+**Critical:** if `gate` is a **required** check, the workflow must **run on every PR**. Do **not** use `on.pull_request.paths` — that skips the workflow and leaves a missing required check. Filter at the **job** level (`dorny/paths-filter` + conditional `verify` + always-run `gate`).
 
 ```yaml
 # .github/workflows/ci-hello-cli.yml  (example — see module-caller.example.yml)
 name: ci-hello-cli
 
 on:
-  pull_request:
-    paths:
-      - "modules/hello-cli/**"
-      - ".github/workflows/ci-hello-cli.yml"
-      - ".github/workflows/module-ci.yml"
+  pull_request: {}          # no paths — gate can always report
   push:
     branches: [main]
-    paths:
+    paths:                  # optional on main only
       - "modules/hello-cli/**"
       - ".github/workflows/ci-hello-cli.yml"
       - ".github/workflows/module-ci.yml"
@@ -161,27 +159,28 @@ jobs:
 
 ### Why the gate job
 
-GitHub required checks fail a PR when the named check **never runs**. Path filters on `on.pull_request.paths` mean untouched-module workflows are skipped → missing required check → red PR.
+GitHub required checks fail a PR when the named check **never runs**. Workflow-level `paths:` skips the entire workflow → missing check → red PR even when the module was untouched.
 
-**Two layers (intentional):**
+**Correct split:**
 
-1. **Workflow-level `paths:`** — skip the whole workflow when clearly irrelevant (saves Actions minutes; quieter checks list).
-2. **In-workflow `changes` + `gate`** — still needed when the workflow *does* run because of shared reusable workflow edits, or when branch protection requires a stable job name. Also covers `workflow_dispatch`.
+1. **Job-level path filter** (`changes`) — decide whether to call `module-ci`.
+2. **`gate` job** — always runs; green no-op when paths miss; mirrors `verify` when paths hit.
+3. **Workflow-level `paths:`** — only as an optional optimization on `push:main`, or when the check is **not** required.
 
 **This wave / no modules yet:** do **not** register per-module gates in branch protection. Only `repo-meta` is required. When the first real module lands, add its caller + require `ci-<module> / gate`.
 
-### Path-filter nuance for empty-modules wave
+### Empty-modules wave
 
-If GitHub path filters alone skip callers that do not exist, there is nothing to protect. Prefer:
-
-- Ship reusable + `repo-meta` first.
+- Ship reusable + `repo-meta` first (no per-module callers).
 - Add `ci-<module>.yml` in the **same PR** that introduces `modules/<name>/` (devops + dev coordination).
 
 ## 3. Root-meta workflow (`repo-meta.yml`)
 
 Runs on docs / template / CI-definition changes. **Parse/lint only** — never builds modules.
 
-Triggers (sketch):
+Triggers (sketch): conceptually docs/templates/CI — but **required** `repo-meta` uses `pull_request: {}` so the gate always reports. Cheap jobs; no module builds. Optional `paths:` only on `push:main`.
+
+Paths of interest (for humans / future job-level filters):
 
 ```text
 AGENTS.md
@@ -241,12 +240,14 @@ Wave scope: `templates/**`, root context docs, `.github/**` sketches — **no** 
 
 ## 7. Interaction with module-layout prototypes
 
+Sibling layout recommendation: **B** — `templates/module/` + empty documented `modules/` ([`RECOMMENDATION.md`](RECOMMENDATION.md)).
+
 CI seam assumes **verify entry** = `modules/<name>/scripts/ci.sh` and path root = `modules/<name>/**`.
 
-| Layout prototype (sibling) | CI coupling |
+| Layout prototype | CI coupling |
 | --- | --- |
-| **A** — flat `modules/<name>/` + `scripts/ci.sh` | Direct match; callers copy-paste |
-| **B** — same tree + language stubs (`package.json` / `Package.swift`) | Same callers; only `setup:` differs |
-| **C** — nested packages or alt verify path | Requires caller `command:` override or layout rejected for this plan |
+| **A** — template only; no committed `modules/` | Callers wait for first module; `repo-meta` soft on missing `modules/` |
+| **B** — empty `modules/` + README (chosen) | **Ship:** reusable + `repo-meta` only; assert `modules/README.md` in meta once landed; **no** `ci-*.yml` callers this wave |
+| **C** — polyglot template variants | Same callers; only `setup:` / `runner:` differ per language |
 
-If layout C moves verify away from `scripts/ci.sh`, update Work Contract before devops implements.
+If a future layout moves verify away from `scripts/ci.sh`, update Work Contract before devops implements.

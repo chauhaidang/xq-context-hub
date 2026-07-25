@@ -54,13 +54,15 @@ Require **only**:
 
 Do **not** require per-module gates yet (they will not exist / will not run).
 
+`repo-meta` must use `on.pull_request: {}` (no workflow-level `paths:`) so the required gate always appears.
+
 Optional until first module: leave protection unset and rely on PR review + snap; then turn on `repo-meta / gate` when workflows merge to `main`.
 
 ### When first module lands (follow-on PR or later wave)
 
-1. Add `.github/workflows/ci-<module>.yml` from `module-caller.example.yml`.
+1. Add `.github/workflows/ci-<module>.yml` from `module-caller.example.yml` (**job-level** path filter; no PR `paths:`).
 2. Require `ci-<module> / gate` **in addition to** `repo-meta / gate`.
-3. Never require raw `verify` jobs that path-filter away — only **gate** job names.
+3. Never require raw `verify` jobs that are skipped — only **gate** job names.
 
 ### Anti-patterns
 
@@ -83,26 +85,29 @@ Local pre-push not required. Agents verify with snap commands above.
 
 ## Interaction with module-layout prototypes A / B / C
 
-| Layout (sibling) | CI Prototype A behavior |
+Sibling layout pick: **B** (`templates/module/` + empty documented `modules/` — see [`RECOMMENDATION.md`](RECOMMENDATION.md)).
+
+| Layout | CI Prototype A behavior |
 | --- | --- |
-| **A** — `modules/<name>/` + `scripts/ci.sh` | Default; caller `command: ./scripts/ci.sh` |
-| **B** — same + language manifests (`package.json` / `Package.swift`) | Same paths; set `setup: node` or `setup: swift` (+ `runner`) per caller |
-| **C** — alternate verify entry or non-`modules/<name>` root | Blocked unless caller `command` / paths updated in contract |
+| **A** — template only, no `modules/` dir | Works; `repo-meta` soft-warns if `modules/` absent |
+| **B** — empty `modules/` + README (chosen) | **Best fit.** No callers this wave; `repo-meta` can assert `modules/README.md` once landed; first product module adds one caller |
+| **C** — polyglot template variants | Callers still one-per-module; only `setup`/`runner` differ — no CI change required if verify stays `scripts/ci.sh` |
 
-**Recommendation:** layout A or B with stable `scripts/ci.sh`. If layout C breaks that seam, redesign CI before devops implements.
+**Stable seams with layout B:** path filter `modules/<name>/**`, verify `./scripts/ci.sh`, reusable inputs `module` / `setup` / `command` / `runner`.
 
-CI does **not** care about internal src layout beyond: path filter `modules/<name>/**` and cwd verify.
+CI does **not** care about internal src layout beyond those seams.
 
 ## Follow-on for engineer-in-devops (Phase 1 / WP3)
 
 1. Copy `module-ci.yml` + `repo-meta.yml` into `checkouts/xq-versastack/.github/workflows/` on `feat/versastack-fast-delivery`.
 2. Pin concrete actions (`actions/checkout@v4`, `setup-node`, Swift setup action, `dorny/paths-filter@v3`).
 3. Decide PyYAML vs structural-only parse for `repo-meta` (prototype allows both).
-4. Place `module-caller.example.yml` under `templates/module/github/ci-<module>.yml.example` (or docs) — **do not** invent a skeleton module just to hang a caller.
-5. Document required-check names in module scaffold README (“when you add a module, copy caller + ask for branch protection update”).
+4. Place `module-caller.example.yml` under `templates/module/` or docs as example — **do not** invent a skeleton module or a live `ci-*.yml` just to hang a caller (aligns with layout B).
+5. Document required-check names in module/`modules/README.md` add-module steps (“copy caller + ask for branch protection update”).
 6. Optional: `scripts/changed-modules.sh` (list only; never called by workflows as orchestrator).
-7. Coordinate with test role: `templates/module/scripts/ci.sh` must be executable / bash-safe for reusable workflow.
-8. After first real module wave: materialize caller + update branch protection.
+7. Coordinate with test role: `templates/module/scripts/ci.sh` must be bash-safe for reusable workflow.
+8. Include `modules/README.md` in meta expectations once layout B lands.
+9. After first real module wave: materialize caller + update branch protection.
 
 ## Open questions for user
 
