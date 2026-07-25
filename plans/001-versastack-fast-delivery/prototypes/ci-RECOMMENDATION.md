@@ -113,6 +113,7 @@ CI does **not** care about internal src layout beyond those seams.
 
 1. **Branch protection timing:** enable `repo-meta / gate` on first merge to `main`, or wait until after scaffold PR merges?
 2. **Swift runner default:** prototype uses `runner` input defaulting to `ubuntu-latest`; OK to require `macos-14` (or latest) only on Swift callers?
-3. **Caller example location:** `templates/module/` vs `docs/ci/` vs only under hub `prototypes/` until first module?
-4. **`dorny/paths-filter` dependency:** acceptable third-party action, or prefer pure `git diff` in the gate job?
-5. **Skeleton still out?** Plan says no product module this wave — confirm CI ships with **zero** `ci-*.yml` callers (only reusable + repo-meta).
+3. **Caller example location:** `templates/module/` vs `docs/ci/` vs only under hub `prototypes/` until first module? (CI design default: keep example in hub prototypes + short pointer in `modules/README.md`.)
+4. **`dorny/paths-filter` dependency:** acceptable third-party action, or prefer pure `git diff` in the `changes` job?
+5. **Confirm zero live callers this wave:** layout B + no skeleton → ship only `module-ci.yml` + `repo-meta.yml` (yes — recommended).
+6. **Approve CI Prototype A + layout B together?** Structure sibling already recommends B; CI recommends A — product-lead should snap both before Phase 1.
