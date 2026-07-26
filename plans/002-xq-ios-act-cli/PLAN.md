@@ -98,7 +98,8 @@ cd checkouts/xq-versastack/modules/xq-ios-act-cli
 
 ### WP0 — contract / design (**now**)
 
-- **Role**: `engineer-in-design` (optional) + product-lead + user approval
+- **Role**: `engineer-in-design` + product-lead + user approval
+- **Design artifact**: [`DESIGN.md`](DESIGN.md) — CLI surface, tech stack, architecture, seams
 - **Done when**: open questions resolved; acceptance criteria locked; plan status → `ready`
 
 ### WP1 — parallel wave (after approval)
@@ -150,6 +151,7 @@ REVIEW:  engineer-in-review → one PR (user-approved remote_writes)
 
 ## Links
 
+- **Design**: [`DESIGN.md`](DESIGN.md)
 - Research: `checkouts/xq-versastack/docs/research/xq-ios-act-cli.md`
 - DeviceKit: https://github.com/mobile-next/devicekit-ios
 - Domain: [`domains/harness/CONTEXT.md`](../../domains/harness/CONTEXT.md)
