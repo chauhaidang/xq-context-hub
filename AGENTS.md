@@ -30,6 +30,5 @@ Do not preload the whole hub. Do not paste long procedures into this file.
 | Plan / contract / snap / issue progress | subagent `product-lead` |
 | Parallel wave (same branch) | `engineer-in-dev` + `test` + `devops` |
 | Post-snap review | `engineer-in-review` |
-| Grill / wayfinder | `checkouts/xq-harness/.agents/skills/` after sync |
 
 Way of work: [`docs/agents/parallel-wave.md`](docs/agents/parallel-wave.md).

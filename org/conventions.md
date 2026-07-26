@@ -10,6 +10,9 @@ etiquette.
 - Confirm working directory before destructive or wide-ranging commands
 - Resolve product repos under this hub as `checkouts/<repo>/` only (see
   `org/links.yaml` → `checkout_root`)
+- Every linked repo must expose `CONSUMER_CONTEXT.md`, `AGENTS.md`, or
+  `AGENT.md` (see `docs/agents/consumer-context.md`; audit with
+  `./scripts/audit-consumer-context.sh`)
 - Sync with `./scripts/sync-repos.sh` before editing linked product code
 - Match existing patterns in the target repo; keep diffs minimal
 - Use `@chauhaidang` for published packages; configure GitHub Packages auth via

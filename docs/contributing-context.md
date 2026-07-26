@@ -26,7 +26,8 @@ Use the `add-domain-context` skill, or:
 When a repo is created, renamed, or its role changes:
 
 1. Edit `org/catalogue.md` (one-line role)
-2. Add or update the entry in `org/links.yaml` (url, domain, default_branch)
+2. If the hub should **checkout** it, add it to `org/links.yaml` (url, domain,
+   default_branch) — keep the active set intentional (today: harness + versastack)
 3. If it belongs to a domain, update that domain’s Related repos table
 4. If it deserves a new domain, follow “Add a domain”
 

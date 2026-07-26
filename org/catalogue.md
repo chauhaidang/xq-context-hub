@@ -3,6 +3,10 @@
 One-line roles for agents. Prefer [`CONTEXT-MAP.md`](../CONTEXT-MAP.md) to
 choose a domain before opening product code.
 
+**Active hub checkouts** (cloned via [`links.yaml`](links.yaml)): `xq-harness`,
+`xq-versastack` only. Everything else below is org inventory — not auto-synced
+until added to `links.yaml`.
+
 ## Context and agent tooling
 
 | Repo | Role |

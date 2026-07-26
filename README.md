@@ -43,10 +43,14 @@ checkouts/xq-harness/
 Registry: [`org/links.yaml`](org/links.yaml) (`checkout_root: checkouts`).
 
 ```bash
-./scripts/sync-repos.sh                 # all linked repos
-./scripts/sync-repos.sh --domain fitness
+./scripts/sync-repos.sh                      # xq-harness + xq-versastack
 ./scripts/sync-repos.sh --repo xq-harness
+./scripts/audit-consumer-context.sh          # linked repos must have context
 ```
+
+Active links are only **`xq-harness`** and **`xq-versastack`**
+([`org/links.yaml`](org/links.yaml)). Each must expose `CONSUMER_CONTEXT.md`,
+`AGENTS.md`, or `AGENT.md` (see [`docs/agents/consumer-context.md`](docs/agents/consumer-context.md)).
 
 Agents must implement and open PRs from paths under `checkouts/<repo>/`, never
 from ad-hoc sibling directories outside this hub.

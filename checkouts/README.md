@@ -22,3 +22,6 @@ checkouts/<repo-name>/   # e.g. checkouts/xq-fitness-write/
 ```
 
 See [`org/links.yaml`](../org/links.yaml) for the registry (`checkout_root` + remotes).
+
+After sync, each checkout should contain `CONSUMER_CONTEXT.md`, `AGENTS.md`, or
+`AGENT.md`. Audit with `./scripts/audit-consumer-context.sh`.

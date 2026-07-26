@@ -28,22 +28,20 @@ Read order:
 
 ### Sibling CI prototypes (devops design)
 
-Path-filter / reusable-workflow spikes live alongside this package:
+| Proto | Idea | Status |
+| --- | --- | --- |
+| [ci-A](./ci-A-reusable-caller.md) | Reusable `module-ci.yml` + thin callers | **Rejected** — too generic |
+| [ci-B](./ci-B-single-dispatch.md) | Single matrix / dispatch | **Rejected** |
+| [ci-C](./ci-C-per-module-owned.md) | Each module owns full CI + scripts | **Chosen** (maintainer) |
 
-- [ci-A-reusable-caller.md](./ci-A-reusable-caller.md)
-- [ci-B-single-dispatch.md](./ci-B-single-dispatch.md)
-- [ci-RECOMMENDATION.md](./ci-RECOMMENDATION.md)
-- [ci-TEMPLATE-snippets/](./ci-TEMPLATE-snippets/)
+See [ci-RECOMMENDATION.md](./ci-RECOMMENDATION.md). Snippets under `ci-TEMPLATE-snippets/` are historical for A — prefer sketches in **ci-C**.
 
-Structure recommendation (**B**) is independent of which CI caller shape wins; reconcile at product-lead before Phase 1.
+## Shared invariants (all layout options)
 
-## Shared invariants (all options)
-
-- One module ≈ one activity CLI; own language/toolchain/tests/skills
-- Canonical verify entry: `modules/<name>/scripts/ci.sh` (optional `make ci` → same)
-- Agent skills live **inside** the module (`skills/<skill-name>/SKILL.md`), not at repo root
-- Research stays under `docs/research/`; shipping means `modules/<name>/`
-- Root holds **context + CI wiring + templates** only — never a product toolchain
+- One module ≈ one activity CLI; own language, toolchain, tests, skills, **scripts**, and **CI workflow**
+- Agent skills live **inside** the module — not at repo root
+- Research stays under `docs/research/`; shipping means `modules/<name>/` + `.github/workflows/ci-<name>.yml`
+- Root holds **context** (+ optional meta lint) — never a shared module CI framework or product toolchain
 
 ## Research drivers (polyglot reality)
 
