@@ -74,8 +74,8 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Sw
 2. **Runtime dependency** — DeviceKit on device/sim at documented default `http://127.0.0.1:12004` (not vendored)
 
 3. **Verification** — from `modules/xq-ios-act-cli/`:
-   - `bash tests/run-static.sh`
-   - `bash tests/run-all.sh` → `swift test` + TSR generation
+   - `bash scripts/run-static.sh`
+   - `bash scripts/run-all.sh` → `swift test` + TSR generation
 
 4. **CI** — `.github/workflows/ci-xq-ios-act-cli.yml`, paths: `modules/xq-ios-act-cli/**`, workflow file
 
@@ -84,12 +84,12 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Sw
 | Role | Owns (paths / globs) | Must not touch |
 | --- | --- | --- |
 | dev | `modules/xq-ios-act-cli/Sources/**`, `Package.swift`, module `README.md`, root consumer pointers | unrelated modules; root runner |
-| test | `modules/xq-ios-act-cli/Tests/**`, `modules/xq-ios-act-cli/tests/**`, `tsr/` generation | `.github/**` unless coordinated |
+| test | `modules/xq-ios-act-cli/Tests/**`, `modules/xq-ios-act-cli/scripts/**`, `tsr/` generation | `.github/**` unless coordinated |
 | devops | `.github/workflows/ci-xq-ios-act-cli.yml` | CLI business logic |
 
 ### Acceptance
 
-- [ ] `cd modules/xq-ios-act-cli && bash tests/run-all.sh` passes on macOS without DeviceKit
+- [ ] `cd modules/xq-ios-act-cli && bash scripts/run-all.sh` passes on macOS without DeviceKit
 - [ ] `xq-ios-act --help` shows examples on subcommands
 - [ ] CI green on module PR
 
@@ -97,8 +97,8 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Sw
 
 ```bash
 cd checkouts/xq-versastack/modules/xq-ios-act-cli
-bash tests/run-static.sh
-bash tests/run-all.sh
+bash scripts/run-static.sh
+bash scripts/run-all.sh
 
 # Optional live check when DeviceKit is running:
 swift run xq-ios-act health --base-url http://127.0.0.1:12004
