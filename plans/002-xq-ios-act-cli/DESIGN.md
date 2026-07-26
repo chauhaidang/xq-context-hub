@@ -1,6 +1,7 @@
 # Design: xq-ios-act-cli
 
 - **Plan**: [`PLAN.md`](PLAN.md)
+- **Benchmark**: [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
 - **Role**: `engineer-in-design`
 - **Status**: draft for product-lead / user review
 - **Repo**: `xq-versastack` → `modules/xq-ios-act-cli/`
@@ -319,8 +320,8 @@ No `xq-ios-act devicekit install` in v1.
 | D1 | Swift SPM module; library `XqIosAct` + executable `xq-ios-act` |
 | D2 | WebSocket for all RPC; HTTP only for `health` |
 | D3 | v1 = subcommands; no REPL |
-| D4 | `rpc` escape hatch + curated convenience wrappers (see command tree) |
-| D5 | `DeviceKitTransport` protocol for testability |
+| D4 | Flat verbs + `map`/`diff map`/`@ref` workflow (Vibium-shaped); `rpc` escape hatch |
+| D5 | `DeviceKitTransport` protocol + `MapStore` for ref cache |
 | D6 | Structured `--json` envelope with raw DeviceKit `result` |
 | D7 | Verify scripts in `scripts/`; Swift tests in `Tests/` |
 | D8 | DeviceKit lifecycle document-only in v1 |
@@ -329,9 +330,9 @@ No `xq-ios-act devicekit install` in v1.
 
 ## Open items for product-lead / user
 
-1. **Confirm v1 command tree** — is `dump ui` + `io tap/text` + `apps launch/foreground` the right cut, or slimmer?
-2. **Screenshot output** — `--json` returns base64 inline vs `--out PATH` writes file (recommend: both; default inline in JSON, optional `--out` for PNG file)
-3. **Discard premature PR #8** — implementation predates this design; recommend close and re-implement from contract
+1. **Confirm Vibium-shaped UX** — flat verbs + `map` → `@ref` → `tap` → `diff map` as primary agent loop?
+2. **Screenshot output** — `--json` inline base64 + optional `-o PATH` for PNG file?
+3. **Discard premature PR #8** — re-implement from updated design?
 
 ---
 
