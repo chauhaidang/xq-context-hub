@@ -93,7 +93,16 @@ modules/xq-ios-act-cli/
       DeviceKitClient.swift   # Facade: health + call(method:params:)
       Output.swift            # --json envelope + human formatting
     xq-ios-act/
-      XqIosActCLI.swift       # ArgumentParser entry + subcommands
+      Commands/                 # one file per verb (Vibium pattern)
+        Health.swift
+        Map.swift
+        Tap.swift
+        ...
+      KitCall.swift             # uniform dispatch → DeviceKitClient
+      XqIosActCLI.swift         # ArgumentParser root + global flags
+    XqIosAct/
+      ...
+      MapStore.swift            # last-map + @ref cache (file-backed)
   Tests/
     XqIosActTests/            # codec, URL, mock transport, client
   scripts/
@@ -138,41 +147,26 @@ enum CLIOutput { ... }
 
 ### Command tree
 
+> **Updated after [Vibium benchmark](VIBIUM-BENCHMARK.md):** prefer **flat verbs** and a **map → @ref → act → diff** loop (Vibium-shaped), not deep nesting.
+
 ```text
 xq-ios-act [--json] [--base-url URL] [--timeout SEC]
 
   health
-      GET /health — liveness before automation
-
-  rpc --method NAME [--params JSON]
-      Escape hatch for any DeviceKit JSON-RPC method
-
-  device
-    info
-        device.info
-    screenshot [--format png|jpeg] [--quality 1-100]
-        device.screenshot
-    dump ui [--out PATH]
-        device.dump.ui — write JSON tree to file or stdout
-
-  io
-    tap --x INT --y INT [--device-id any]
-        device.io.tap
-    text --value STRING
-        device.io.text
-    button --name home|lock|volumeUp|volumeDown
-        device.io.button
-
-  apps
-    launch --bundle-id ID
-        device.apps.launch
-    foreground
-        device.apps.foreground
-    terminate --bundle-id ID
-        device.apps.terminate
+  map [--out PATH]                # device.dump.ui + client @ref assignment
+  diff map                        # compare to cached last map
+  tap @eN | --x INT --y INT
+  type TEXT | --ref @eN TEXT
+  screenshot [-o PATH]
+  launch --bundle-id ID
+  foreground
+  dump                            # raw device.dump.ui JSON
+  rpc --method NAME [--params JSON]   # escape hatch
 ```
 
-**v1 scope lock (recommended):** `health`, `rpc`, `device {info, screenshot, dump ui}`, `io {tap, text}`, `apps {launch, foreground}`. Defer swipe/gesture/orientation/url to `rpc` or v1.1 wrappers.
+**v1 scope lock (recommended):** commands above + `rpc`. Swipe/gesture/orientation via `rpc` until v1.1.
+
+**Local session (Vibium-inspired):** cache last map + ref table under `~/.xq-ios-act/` (or `$XQ_IOS_ACT_STATE_DIR`); invalidate refs after UI-changing acts — document in skill.
 
 ### Agent-native behaviors
 
