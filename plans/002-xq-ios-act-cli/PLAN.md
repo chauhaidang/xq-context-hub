@@ -3,7 +3,7 @@
 - **ID**: `002-xq-ios-act-cli`
 - **Hub issue**: _(not opened — plan not approved yet)_
 - **Domains**: harness (`domains/harness/CONTEXT.md`) — `xq-versastack` only
-- **Status**: drafting
+- **Status**: drafting — **WP0.5 prototypes next**
 
 ## Goal
 
@@ -111,6 +111,27 @@ cd swift && swift build && .build/debug/xq-ios-act health
 
 ## Work packages
 
+### WP0.5 — throwaway prototypes (**next — before WP1**)
+
+Quick spikes to validate **both stacks** against the locked contract. Code lives under `prototypes/` and is **deleted or replaced** before WP1 — not merged as product.
+
+| Goal | Validate |
+| --- | --- |
+| Python | Fire globals, JSON-default + `--pretty`, `health` + `rpc`, mock/offline test |
+| Swift | ArgumentParser, same output envelope, `health` + `rpc`, `swift test` offline |
+| Contract | Same exit codes and JSON envelope shape on both |
+
+**Location:** `modules/xq-ios-act-cli/prototypes/python/` and `prototypes/swift/`
+
+**Done when:**
+
+- [ ] `uv run` / `swift run` — `health` and `rpc` work with mock or fail gracefully without DeviceKit
+- [ ] JSON default + `--pretty` demonstrated on both
+- [ ] Short `prototypes/LEARNINGS.md` — what worked, what to change for WP1
+- [ ] User/product-lead sign-off → plan `ready` → **discard `prototypes/`** and start WP1 clean layout (`python/`, `swift/`)
+
+**Explicitly out of scope for prototypes:** full verb tree, MapStore, CI, `uv tool install`, live DeviceKit gate.
+
 ### WP0 — contract / design (**now**)
 
 - **Role**: `engineer-in-design` + product-lead + user approval
@@ -170,9 +191,9 @@ cd swift && swift build && .build/debug/xq-ios-act health
 ## Sequencing
 
 ```text
-NOW:     product-lead + user — resolve open questions; lock plan
-NEXT:    optional engineer-in-design — refine CLI contract / command tree
-THEN:    parallel wave (dev + test + devops) on approved branch
+NOW:     WP0.5 — throwaway prototypes (python + swift) under prototypes/
+NEXT:    learnings → user sign-off → plan status ready
+THEN:    discard prototypes/ → WP1 (python/) + WP1b (swift/) clean implementation
 SNAP:    product-lead/root — run snap commands
 REVIEW:  engineer-in-review → one PR (user-approved remote_writes)
 ```

@@ -131,9 +131,22 @@ No `uv tool` path for Swift. README documents when to prefer Swift (macOS-only, 
 
 ---
 
+## Prototype spike (WP0.5)
+
+Throwaway validation **before** WP1. Lives in `prototypes/` only — **not** shipped.
+
+| Client | Min scope | Pass criteria |
+| --- | --- | --- |
+| Python | Fire, `health`, `rpc`, JSON default, `--pretty` | `uv run` + offline pytest |
+| Swift | ArgumentParser, `health`, `rpc`, same envelope | `swift test` without DeviceKit |
+
+Output: `prototypes/LEARNINGS.md` → user sign-off → delete `prototypes/` → WP1 clean tree.
+
+---
+
 ## Architecture
 
-### Module layout (dual client)
+### Module layout (dual client — target after prototypes)
 
 ```text
 modules/xq-ios-act-cli/
