@@ -131,6 +131,8 @@ No `uv tool` path for Swift. README documents when to prefer Swift (macOS-only, 
 
 ---
 
+## Architecture
+
 ### Module layout (dual client)
 
 ```text
