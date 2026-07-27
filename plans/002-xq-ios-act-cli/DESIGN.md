@@ -8,7 +8,7 @@
 
 ## Summary
 
-`xq-ios-act` is a **host-side Python CLI** that speaks **DeviceKit JSON-RPC over WebSocket**. It gives coding agents stable verbs, structured `--json` output, and predictable exit codes — without MobileCLI as the control plane.
+`xq-ios-act` is a **host-side Python CLI** that speaks **DeviceKit JSON-RPC over WebSocket**. It gives coding agents stable JSON output by default, optional `--pretty` for humans, and predictable exit codes — without MobileCLI as the control plane.
 
 **Language (locked):** **Python 3.11+** — fast iteration, strong test ergonomics, and a transport/JSON-RPC layer that can be **shared with a future Android client** ([devicekit-android](https://github.com/mobile-next/devicekit-android) uses the same JSON-RPC methods over HTTP via `adb forward`).
 
@@ -23,7 +23,7 @@
 | Constraint | Implication |
 | --- | --- |
 | DeviceKit runs on sim/device as XCUITest server | CLI is a **host-side client**; we do not vendor or embed DeviceKit |
-| Agents need headless, composable tools | Non-interactive flags, `--json`, examples on `--help` |
+| Agents need headless, composable tools | **JSON by default**; `--pretty` for humans; examples on `--help` |
 | Versastack module independence | `pyproject.toml` + module-local verify + path-scoped CI only |
 | Future Android parity | Keep JSON-RPC codec, transport protocol, `MapStore`, and output envelope **platform-agnostic** in `xq_ios_act/` |
 | FSL-1.1 DeviceKit license | Document runtime dependency; no source bundling |
@@ -152,16 +152,18 @@ class MapStore:
 | --- | --- | --- |
 | `--base-url` | `http://127.0.0.1:12004` | DeviceKit HTTP base (WS derived as `/ws`) |
 | `--timeout` | `30` | Per-request seconds |
-| `--json` | off | Machine-readable stdout |
+| `--pretty` | off | Human-readable stdout (default is compact JSON envelope) |
 
 **Env overrides (optional v1):** `XQ_IOS_ACT_BASE_URL`, `XQ_IOS_ACT_TIMEOUT`
+
+**Output rule:** stdout is always **one structured result per command**. Default = compact JSON; `--pretty` = concise human summary. Agents never need a flag to parse output.
 
 ### Command tree
 
 > **Updated after [Vibium benchmark](VIBIUM-BENCHMARK.md):** prefer **flat verbs** and a **map → @ref → act → diff** loop (Vibium-shaped), not deep nesting.
 
 ```text
-xq-ios-act [--json] [--base-url URL] [--timeout SEC]
+xq-ios-act [--pretty] [--base-url URL] [--timeout SEC]
 
   health
   map [--out PATH]                # device.dump.ui + client @ref assignment
@@ -187,7 +189,8 @@ Per [CLI for agents](https://github.com/chauhaidang/xq-context-hub) conventions:
 2. **Examples on every `--help`** — real copy-paste invocations
 3. **Actionable errors** — stderr includes `hint` with a correct example command
 4. **Idempotent where possible** — `health`, `dump` are read-only; `launch` may no-op if already foreground (document DeviceKit behavior)
-5. **Success output** — human: concise summary; `--json`: structured envelope (below)
+5. **Success output** — default: compact JSON envelope (below); `--pretty`: concise human summary on stdout
+6. **Errors follow the same mode** — default: JSON envelope with `ok: false`; `--pretty`: one-line message + `hint` on stderr
 
 ### JSON output envelope
 
@@ -224,6 +227,23 @@ Per [CLI for agents](https://github.com/chauhaidang/xq-context-hub) conventions:
 
 `result` is the **raw DeviceKit JSON-RPC result** (no lossy re-shaping) so agents can rely on upstream semantics.
 
+### Pretty output (human mode)
+
+With `--pretty`, stdout is plain text — not JSON. Examples:
+
+```text
+$ xq-ios-act health --pretty
+ok  devicekit reachable  http://127.0.0.1:12004  (12ms)
+
+$ xq-ios-act map --pretty
+map  42 elements  @e1..@e42  saved ~/.xq-ios-act/last-map.json
+
+$ xq-ios-act tap @e3 --pretty
+tap  @e3  (120, 44)  ok
+```
+
+Errors with `--pretty`: stderr shows `error: …` and `hint: …`; exit code unchanged.
+
 ### Exit codes
 
 | Code | Meaning |
@@ -241,14 +261,14 @@ Per [CLI for agents](https://github.com/chauhaidang/xq-context-hub) conventions:
 ### v1: one process, one WS connection per command
 
 ```text
-Agent runs: xq-ios-act dump --json
+Agent runs: xq-ios-act dump
 
   CLI parse flags
     → asyncio.run: open WS to ws://127.0.0.1:12004/ws
     → send {"jsonrpc":"2.0","method":"device.dump.ui","id":1}
     → receive response
     → close WS
-    → print envelope / exit
+    → print JSON envelope (or pretty text if --pretty) / exit
 ```
 
 **Why WS for one-shot:** keeps transport consistent with future multi-RPC session; avoids baking HTTP `/rpc` as the default path agents learn.
@@ -334,7 +354,7 @@ No `xq-ios-act devicekit install` in v1.
 | D3 | v1 = flat Typer verbs; no REPL |
 | D4 | Vibium-shaped `map` / `@ref` / `diff map` + `rpc` escape hatch |
 | D5 | `DeviceKitTransport` protocol + `MapStore` |
-| D6 | `--json` envelope with raw DeviceKit `result` |
+| D6 | **JSON envelope by default**; `--pretty` for human stdout |
 | D7 | `scripts/run-all.sh` → `pytest` + TSR |
 | D8 | DeviceKit lifecycle document-only in v1 |
 | D9 | Android = shared Python transport/core later (not v1 scope) |
@@ -343,7 +363,7 @@ No `xq-ios-act devicekit install` in v1.
 
 ## Open items for product-lead / user
 
-1. **Screenshot output** — `--json` inline base64 + optional `-o PATH` for PNG file?
+1. **Screenshot output** — default JSON includes base64 in `result`; optional `-o PATH` writes PNG file; `--pretty` prints path/summary?
 2. **Discard premature versastack PR #8** — Swift scaffold predates approved design; re-implement in Python after approval?
 
 ---

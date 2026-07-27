@@ -91,7 +91,10 @@ Refs are **stable within a page state**; agents re-map after navigation/DOM chan
 
 | Flag | Purpose |
 | --- | --- |
-| `--json` | `{"ok":true,"result":"..."}` / `{"ok":false,"error":"..."}` |
+| `--json` (opt-in) | `{"ok":true,"result":"..."}` / `{"ok":false,"error":"..."}` |
+| Human mode | Plain text only |
+
+**Our deviation:** JSON **by default**; `--pretty` for human text (agent-first).
 | `--headless` | Runtime mode |
 | `-v` | Debug logging |
 
@@ -153,7 +156,7 @@ Agent / skill
 Flat verbs first; group only for `daemon`-like ops if we add them later:
 
 ```text
-xq-ios-act [--json] [--base-url URL] [--timeout SEC]
+xq-ios-act [--pretty] [--base-url URL] [--timeout SEC]
 
   health
   map [--out PATH]              # dump UI + assign @refs (core loop)

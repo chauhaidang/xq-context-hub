@@ -54,7 +54,7 @@ _(Draft — finalize after open questions below.)_
 
 - [ ] `modules/xq-ios-act-cli/` with `pyproject.toml`, CLI, tests, README
 - [ ] README: prerequisites (Python 3.11+, DeviceKit on iOS; Xcode for sim), install (`pip install -e .`), usage, exact verification commands
-- [ ] Agent-native CLI: `--help` with examples, `--json`, non-interactive flags, actionable errors
+- [ ] Agent-native CLI: `--help` with examples, **JSON by default**, `--pretty` for humans, non-interactive flags, actionable errors
 - [ ] Vibium-shaped v1 command tree: `health`, `map`, `diff map`, `tap`, `type`, `screenshot`, `launch`, `foreground`, `dump`, `rpc`
 - [ ] Default verification passes **without** live DeviceKit
 - [ ] `.github/workflows/ci-xq-ios-act-cli.yml` runs documented checks (Linux default, path-filtered)
@@ -135,7 +135,7 @@ bash scripts/run-all.sh
 | 4 | **Real-device setup** | A) document port-forward/tunnel B) optional MobileCLI `agent install` docs C) own scripts | **A + B** documented; no hard dep on MobileCLI |
 | 5 | **Agent skill in v1?** | Ship with module vs follow-on | **Follow-on** (match scout-kit maturity path) |
 | 6 | **Live CI gate** | Default CI unit-only vs optional `workflow_dispatch` live DeviceKit | **Unit-only default**; live gate optional WP3 on macOS |
-| 7 | **Screenshot in v1** | Convenience `screenshot` vs `rpc` only | **Convenience wrapper** — `--json` base64 + optional `-o PATH` |
+| 7 | **Screenshot in v1** | Convenience `screenshot` vs `rpc` only | **Convenience wrapper** — default JSON base64 in `result` + optional `-o PATH`; `--pretty` shows summary |
 | 8 | **Language** | Swift vs Python vs Go | **Python 3.11+** — user decision _(locked)_ |
 
 ## Notes / decisions
