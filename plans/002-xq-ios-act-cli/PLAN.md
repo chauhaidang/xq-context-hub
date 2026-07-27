@@ -7,7 +7,7 @@
 
 ## Goal
 
-Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Python CLI** that controls and inspects iOS simulators/devices through **Mobile Next DeviceKit** over **WebSocket JSON-RPC**, with a transport layer designed for a future **Android** backend.
+Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Swift CLI** that controls and inspects iOS simulators/devices through **Mobile Next DeviceKit** over **WebSocket JSON-RPC**, with Vibium-shaped flat verbs and a transport layer that can grow into session mode in v2.
 
 ## Non-goals
 
@@ -15,6 +15,7 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Py
 - MobileCLI as the runtime API (optional ops helper only, documented later)
 - MJPEG/H264 streaming helpers in v1 (RPC-thin first)
 - Changes to `xq-harness` or hub org glossaries
+- Android transport in this module (separate follow-on module later)
 - Implementation before this plan is approved by user/product-lead
 
 ## Before / After
@@ -22,13 +23,13 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Py
 | Aspect | Before | After |
 | --- | --- | --- |
 | Behavior | Research only (`docs/research/xq-ios-act-cli.md`) | Shipped module with documented CLI, tests, CI |
-| Surfaces | No CLI | `xq-ios-act` binary with agent-native subcommands (TBD — see open questions) |
+| Surfaces | No CLI | `xq-ios-act` binary with Vibium-shaped flat verbs (see [`DESIGN.md`](DESIGN.md)) |
 | Evidence | None | Module `tsr/` + macOS CI workflow scoped to the module |
 
 ## Test approach
 
-- **Layers**: unit (JSON-RPC codec, URL/session helpers), static (help/README contract), integration optional behind env flag when DeviceKit is reachable
-- **Seams**: mock JSON-RPC in unit tests; default `run-all` must not require live sim/DeviceKit
+- **Layers**: unit (JSON-RPC codec, URL/session helpers, mock transport), static (help/README contract), integration optional behind env flag when DeviceKit is reachable
+- **Seams**: `DeviceKitTransport` protocol + mock in unit tests; default `run-all` must not require live sim/DeviceKit
 - **Fixtures**: canned request/response pairs; optional recorded DeviceKit responses when live gate exists
 - **Environments**: local snap on macOS; CI on `macos-14` (or newer) runner
 - **Out of scope for v1 CI**: real-device tunnel automation, broadcast/MJPEG/H264 streams
@@ -39,7 +40,7 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Py
 - [ ] Failure / negative: connection refused, JSON-RPC error, missing required flags
 - [ ] Edge / boundary: empty params, large base64 screenshot payload
 - [ ] Regression: WS is default transport for RPC loops (not one-shot HTTP per command)
-- [ ] Evidence: `tsr/summary.md` + `tsr/junit.xml` (or swift xunit equivalent)
+- [ ] Evidence: `tsr/summary.md` + `tsr/junit.xml` (swift xunit output)
 
 ## Target repos
 
@@ -52,8 +53,9 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Py
 _(Draft — finalize after open questions below.)_
 
 - [ ] `modules/xq-ios-act-cli/` with `Package.swift`, CLI, tests, README
-- [ ] README: prerequisites (Swift 5.9+, Xcode 15+, DeviceKit runtime), install, usage, exact verification commands
+- [ ] README: prerequisites (Swift 5.9+, Xcode for sim), install (`swift build`), usage, exact verification commands
 - [ ] Agent-native CLI: `--help` with examples, `--json`, non-interactive flags, actionable errors
+- [ ] Vibium-shaped v1 command tree: `health`, `map`, `diff map`, `tap`, `type`, `screenshot`, `launch`, `foreground`, `dump`, `rpc`
 - [ ] Default verification passes **without** live DeviceKit
 - [ ] `.github/workflows/ci-xq-ios-act-cli.yml` runs documented checks (macOS, path-filtered)
 - [ ] Root `README.md`, `modules/README.md`, `CONSUMER_CONTEXT.md` updated when module ships
@@ -66,11 +68,12 @@ _(Draft — finalize after open questions below.)_
 
 ### Interfaces / seams _(draft)_
 
-1. **CLI binary** — `xq-ios-act` (Swift `Package.swift`, module-local only)
-2. **Runtime dependency** — DeviceKit reachable at documented default `http://127.0.0.1:12004` (not vendored)
-3. **Transport** — WebSocket JSON-RPC for RPC; HTTP acceptable for `/health` only
-4. **Verification** — module-owned scripts (exact names TBD; avoid `tests/` vs Swift `Tests/` collision on macOS — prefer `scripts/`)
-5. **CI** — full root workflow `.github/workflows/ci-xq-ios-act-cli.yml`, path-scoped to module
+1. **CLI** — `xq-ios-act` executable (`Package.swift` product)
+2. **Library** — `XqIosAct` target: `DeviceKitTransport`, `kitCall()`, `MapStore`, JSON-RPC codec
+3. **Runtime dependency** — DeviceKit reachable at documented default `http://127.0.0.1:12004` (not vendored)
+4. **Transport** — WebSocket JSON-RPC for RPC; HTTP acceptable for `/health` only
+5. **Verification** — module-owned scripts in `scripts/` (not `Tests/` — macOS case-insensitivity)
+6. **CI** — full root workflow `.github/workflows/ci-xq-ios-act-cli.yml`, path-scoped to module
 
 ### File ownership _(for parallel wave)_
 
@@ -91,6 +94,8 @@ _(Draft — finalize after open questions below.)_
 
 ```bash
 cd checkouts/xq-versastack/modules/xq-ios-act-cli
+swift build
+bash scripts/run-all.sh
 # exact commands = module README (written by dev/test)
 ```
 
@@ -106,8 +111,8 @@ cd checkouts/xq-versastack/modules/xq-ios-act-cli
 
 | Role | Package | Ownership |
 | --- | --- | --- |
-| dev | CLI + JSON-RPC client + module README | `src/**`, `pyproject.toml` |
-| test | pytest + static verify + TSR | `tests/**`, `scripts/**` |
+| dev | CLI + JSON-RPC client + module README | `Sources/**`, `Package.swift` |
+| test | `swift test` + static verify + TSR | `Tests/**`, `scripts/**` |
 | devops | macOS CI workflow | `.github/workflows/ci-xq-ios-act-cli.yml` |
 
 ### WP2 — agent skill (likely follow-on)
@@ -124,16 +129,19 @@ cd checkouts/xq-versastack/modules/xq-ios-act-cli
 
 | # | Question | Options | Recommendation |
 | --- | --- | --- | --- |
-| 1 | **v1 interaction model** | A) subcommands only B) REPL/session mode C) both | **A** for v1; session in WP2+ |
-| 2 | **v1 command surface** | Minimal (`health`, `rpc`, `device info`) vs broader (`tap`, `type`, `dump ui`, `apps launch`, …) | **Minimal + `rpc` escape hatch**; add convenience wrappers for top 3–5 methods |
-| 3 | **DeviceKit lifecycle** | A) document-only B) thin sim launcher helper | **A** for v1 |
+| 1 | **v1 interaction model** | A) subcommands only B) REPL/session mode C) both | **A** for v1; session in v2 _(locked in DESIGN)_ |
+| 2 | **v1 command surface** | Minimal vs Vibium-shaped flat verbs | **Vibium-shaped** — `map`, `@ref`, `tap`, `diff map`, `rpc` escape hatch _(locked in DESIGN)_ |
+| 3 | **DeviceKit lifecycle** | A) document-only B) thin sim launcher helper | **A** for v1 _(locked in DESIGN)_ |
 | 4 | **Real-device setup** | A) document port-forward/tunnel B) optional MobileCLI `agent install` docs C) own scripts | **A + B** documented; no hard dep on MobileCLI |
 | 5 | **Agent skill in v1?** | Ship with module vs follow-on | **Follow-on** (match scout-kit maturity path) |
 | 6 | **Live CI gate** | Default CI unit-only vs optional `workflow_dispatch` live DeviceKit | **Unit-only default**; live gate optional WP3 |
-| 7 | **Screenshot in v1** | Convenience `device screenshot` vs `rpc` only | **Convenience wrapper** (common agent need) |
+| 7 | **Screenshot in v1** | Convenience `screenshot` vs `rpc` only | **Convenience wrapper** — `--json` base64 + optional `-o PATH` |
+| 8 | **Language** | Swift vs Python vs Go | **Swift 5.9+** SPM — user decision _(locked)_ |
 
 ## Notes / decisions
 
+- **Language (locked):** Swift 5.9+, SPM, swift-argument-parser, URLSession WebSocket — see [`DESIGN.md`](DESIGN.md) § Tech stack
+- **Agent UX (locked):** Vibium-shaped flat verbs — see [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
 - Research source: `checkouts/xq-versastack/docs/research/xq-ios-act-cli.md`
 - Prior versastack structure: [`plans/001-versastack-fast-delivery/PLAN.md`](../001-versastack-fast-delivery/PLAN.md) (module independence, per-module CI)
 - Reference module pattern: `modules/xq-scout-kit` (verify scripts, `tsr/`, path-scoped CI)
@@ -152,6 +160,7 @@ REVIEW:  engineer-in-review → one PR (user-approved remote_writes)
 ## Links
 
 - **Design**: [`DESIGN.md`](DESIGN.md)
+- **Benchmark**: [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
 - Research: `checkouts/xq-versastack/docs/research/xq-ios-act-cli.md`
 - DeviceKit: https://github.com/mobile-next/devicekit-ios
 - Domain: [`domains/harness/CONTEXT.md`](../../domains/harness/CONTEXT.md)

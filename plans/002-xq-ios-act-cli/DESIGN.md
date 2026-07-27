@@ -10,6 +10,10 @@
 
 `xq-ios-act` is a **macOS-hosted Swift CLI** that speaks **DeviceKit JSON-RPC over WebSocket**. It gives coding agents stable verbs, structured `--json` output, and predictable exit codes — without MobileCLI as the control plane.
 
+**Language (locked):** **Swift 5.9+** — aligns with DeviceKit/iOS toolchain and Xcode sim workflow. Android automation is a **separate follow-on module** (not shared Swift codebase).
+
+**Agent UX (locked):** Vibium-shaped flat verbs — `map` → `@ref` → `tap` → `diff map` (see [VIBIUM-BENCHMARK.md](VIBIUM-BENCHMARK.md)).
+
 **v1 interaction model:** subcommands only (no REPL). Each invocation is a short-lived process that opens a WS connection, performs one or more RPC round-trips defined by that subcommand, then exits. A persistent session/daemon is **v2**.
 
 ---
@@ -30,29 +34,27 @@
 
 | Layer | Choice | Alternatives considered | Why this choice |
 | --- | --- | --- | --- |
-| Language | **Python 3.11+** | Swift, Go, Node | One codebase for iOS + future Android transports; Vibium ships a Python client; agents already run Python |
-| Packaging | **`pyproject.toml` + `src/` layout** | Poetry-only, flat module | Standard PEP 517; `pip install -e .` for dev; entry point `xq-ios-act` |
-| CLI framework | **[Typer](https://typer.tiangolo.com/)** (Click underneath) | argparse, Click direct | Layered `--help`, subcommands, examples; same family as many agent CLIs |
-| iOS transport | **WebSocket JSON-RPC** (`websockets` lib) | httpx-ws, one-shot HTTP `/rpc` | Matches devicekit-ios; chatty loops; research default |
-| Android transport (future) | **HTTP POST JSON-RPC** via `adb forward` | WS if Android adds it | devicekit-android resident server on `localabstract:devicekit` |
-| HTTP helpers | **httpx** | urllib, requests | Health checks, Android RPC, consistent timeouts |
-| JSON | **`json` stdlib** | pydantic models v1 | Dynamic RPC params/results; keep deps thin |
-| Tests | **pytest** + pytest-xunit or junitxml plugin | unittest | Linux CI for unit tests; `tsr/junit.xml` |
-| Verify wrappers | **bash in `scripts/`** | Makefile only | Matches `xq-scout-kit` module pattern |
+| Language | **Swift 5.9+** | Python, Go | DeviceKit/iOS alignment; stdlib networking; user decision |
+| Packaging | **Swift Package Manager** | Xcode project only | `swift build` / `swift test`; no checked-in `.xcodeproj` for v1 |
+| CLI framework | **[swift-argument-parser](https://github.com/apple/swift-argument-parser)** | Commander, raw `CommandLine` | Layered `--help`, subcommands, examples |
+| WebSocket transport | **`URLSessionWebSocketTask`** | Starscream | Stdlib; no extra WS dependency |
+| HTTP (health) | **`URLSession`** | curl subprocess | Same stack as WS client |
+| JSON | **`Codable` + `JSONValue` enum** | SwiftyJSON | Typed envelope; dynamic RPC params |
+| Concurrency | **`async/await`** | callbacks | Natural for URLSession |
+| Tests | **`swift test` + xunit output** | XCTest via Xcode only | `tsr/junit.xml` |
+| Verify wrappers | **bash in `scripts/`** | Makefile | Matches `xq-scout-kit`; avoids `Tests/` vs `tests/` collision |
 
-### Built-in (stdlib) vs dependencies
+### Built-in (Swift / Apple SDK) vs dependencies
 
-| Capability | Stdlib | Third-party |
+| Capability | Built-in | Dependency |
 | --- | --- | --- |
-| JSON-RPC encode/decode | `json` | — |
-| File map cache | `pathlib`, `json` | — |
-| Exit codes / argv | `sys` | — |
-| CLI structure + `--help` | — | **typer** |
-| iOS WebSocket | — | **websockets** |
-| HTTP health / Android RPC | — | **httpx** |
-| Tests | — | **pytest** |
+| JSON-RPC codec | `Codable`, `JSONEncoder` | — |
+| HTTP + WebSocket | `URLSession`, `URLSessionWebSocketTask` | — |
+| File map cache | `FileManager`, `Codable` | — |
+| CLI parsing + `--help` | — | **swift-argument-parser** |
+| Tests | `XCTest` via `swift test` | — |
 
-**Explicitly not in v1 stack:** MobileCLI, vendored DeviceKit, MJPEG/H264, REPL, MCP server, root versastack workspace.
+**Explicitly not in v1 stack:** MobileCLI, vendored DeviceKit, MJPEG/H264, REPL, MCP server, Android transport.
 
 ---
 
@@ -62,84 +64,77 @@
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│  xq-ios-act (console script / typer app)                     │
-│  flat verbs: map, tap, screenshot, rpc, health               │
+│  xq-ios-act (executable)                                     │
+│  ArgumentParser · flat verbs: map, tap, screenshot, rpc      │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
-│  xq_ios_act (library)                                        │
+│  XqIosAct (library)                                          │
 │  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐ │
-│  │ output      │  │ commands     │  │ KitClient (facade)  │ │
-│  │ envelope    │  │ kit_call()   │  │                     │ │
+│  │ Output      │  │ kitCall()    │  │ DeviceKitClient     │ │
 │  └─────────────┘  └──────────────┘  └──────────┬──────────┘ │
 │  ┌─────────────┐  ┌──────────────┐             │            │
-│  │ jsonrpc     │  │ mapstore     │             │            │
+│  │ JSONRPC     │  │ MapStore     │             │            │
 │  └─────────────┘  └──────────────┘             │            │
 └────────────────────────────────────────────────┼────────────┘
                                                  │
                     ┌────────────────────────────▼────────────┐
-                    │  Transport (Protocol)                      │
-                    │  · IosWebSocketTransport  (v1)             │
-                    │  · AndroidHttpTransport   (future)         │
-                    │  · MockTransport          (tests)          │
+                    │  DeviceKitTransport (protocol)             │
+                    │  · WebSocketTransport (production)         │
+                    │  · MockTransport (unit tests)              │
                     └────────────────────────────┬────────────┘
                                                  │
-         ┌───────────────────┬───────────────────┘
-         ▼                   ▼ (future)
-  devicekit-ios          devicekit-android
-  WS /ws + /health       HTTP via adb forward
+                    ┌────────────────────────────▼────────────┐
+                    │  devicekit-ios (external)                  │
+                    │  GET /health · WS /ws JSON-RPC 2.0         │
+                    └───────────────────────────────────────────┘
 ```
 
 ### Package layout (target)
 
 ```text
 modules/xq-ios-act-cli/
-  pyproject.toml              # deps, entry point xq-ios-act
+  Package.swift
   README.md
-  src/xq_ios_act/
-    __init__.py
-    cli/
-      __init__.py
-      main.py                 # typer app, global flags
-      health.py
-      map_cmd.py
-      tap.py
-      ...
-    jsonrpc.py
-    kit_client.py             # kit_call(method, params)
-    transports/
-      base.py                 # Protocol
-      ios_ws.py
-      android_http.py         # stub / future
-      mock.py
-    mapstore.py
-    output.py
-    urls.py
-  tests/
-    test_jsonrpc.py
-    test_mapstore.py
-    ...
+  Sources/
+    XqIosAct/
+      JSONRPC.swift
+      DeviceKitURL.swift
+      CLIError.swift
+      DeviceKitTransport.swift
+      WebSocketTransport.swift
+      DeviceKitClient.swift
+      MapStore.swift
+      Output.swift
+      KitCall.swift              # uniform dispatch
+    xq-ios-act/
+      XqIosActCLI.swift          # ArgumentParser root + global flags
+      Commands/                  # one file per verb (Vibium pattern)
+        Health.swift
+        Map.swift
+        Tap.swift
+        ...
+  Tests/
+    XqIosActTests/
   scripts/
     run-static.sh
-    run-all.sh                # pytest + tsr/
+    run-all.sh                   # swift test + tsr/
   tsr/
 ```
 
-**Android later:** add `xq-android-act-cli` module *or* extend this package with `--platform android` and shared `xq_ios_act` → rename package to `xq_act` when both ship. v1 keeps module name `xq-ios-act-cli`, but **transport Protocol from day one**.
+**Android later:** separate versastack module (e.g. `xq-android-act-cli`); reuse agent UX patterns from this skill, not Swift code.
 
 ### Core seams (for dev / test parallel wave)
 
-```python
-# Transport — mock in unit tests; swap iOS vs Android later
-class DeviceKitTransport(Protocol):
-    def health(self) -> HealthResult: ...
-    def call(self, method: str, params: dict | None = None) -> Any: ...
+```swift
+protocol DeviceKitTransport: Sendable {
+    func fetchHealth() async throws -> HealthResult
+    func call(method: String, params: JSONValue?, id: Int) async throws -> JSONRPCResponse
+}
 
-# Facade — every typer command calls this
-def kit_call(method: str, params: dict | None = None) -> Any: ...
+func kitCall(_ method: String, params: JSONValue? = nil) async throws -> JSONValue
 
-# Map store — Vibium-style @refs (platform-agnostic)
-class MapStore: ...
+struct MapStore { /* last map + @ref table on disk */ }
 ```
 
 ---
@@ -186,7 +181,7 @@ Per [CLI for agents](https://github.com/chauhaidang/xq-context-hub) conventions:
 1. **Non-interactive first** — every input is a flag; no prompts in v1
 2. **Examples on every `--help`** — real copy-paste invocations
 3. **Actionable errors** — stderr includes `hint` with a correct example command
-4. **Idempotent where possible** — `health`, `device info` are read-only; `launch` may no-op if already foreground (document DeviceKit behavior)
+4. **Idempotent where possible** — `health`, `dump` are read-only; `launch` may no-op if already foreground (document DeviceKit behavior)
 5. **Success output** — human: concise summary; `--json`: structured envelope (below)
 
 ### JSON output envelope
@@ -196,11 +191,11 @@ Per [CLI for agents](https://github.com/chauhaidang/xq-context-hub) conventions:
 ```json
 {
   "ok": true,
-  "command": "device.info",
-  "result": { "width": 390, "height": 844, "scale": 3 },
+  "command": "dump",
+  "result": { "elements": [] },
   "meta": {
     "baseUrl": "http://127.0.0.1:12004",
-    "method": "device.info",
+    "method": "device.dump.ui",
     "durationMs": 38,
     "rpcId": 1
   }
@@ -212,7 +207,7 @@ Per [CLI for agents](https://github.com/chauhaidang/xq-context-hub) conventions:
 ```json
 {
   "ok": false,
-  "command": "device.info",
+  "command": "dump",
   "error": {
     "kind": "transport",
     "message": "Connection refused",
@@ -241,11 +236,11 @@ Per [CLI for agents](https://github.com/chauhaidang/xq-context-hub) conventions:
 ### v1: one process, one WS connection per command
 
 ```text
-Agent runs: xq-ios-act device info --json
+Agent runs: xq-ios-act dump --json
 
   CLI parse flags
     → open WS to ws://127.0.0.1:12004/ws
-    → send {"jsonrpc":"2.0","method":"device.info","id":1}
+    → send {"jsonrpc":"2.0","method":"device.dump.ui","id":1}
     → receive response
     → close WS
     → print envelope / exit
@@ -304,12 +299,11 @@ No `xq-ios-act devicekit install` in v1.
 
 ## CI / devops notes (for parallel wave)
 
-- **Unit tests:** `ubuntu` runner — `pytest` with `MockTransport` (no DeviceKit)
-- **Live iOS gate (optional WP3):** `macos-14` + booted sim + DeviceKit
-- **Live Android gate (future):** emulator + `adb forward` + devicekit-android
-- Trigger paths: `modules/xq-ios-act-cli/**`, `.github/workflows/ci-xq-ios-act-cli.yml`
+- Runner: **`macos-14`** or newer (Swift 5.9+; URLSession WS)
 - Job: `cd modules/xq-ios-act-cli && bash scripts/run-all.sh`
-- No Linux job (URLSession WS + macOS host assumption)
+- Trigger paths: `modules/xq-ios-act-cli/**`, `.github/workflows/ci-xq-ios-act-cli.yml`
+- Optional WP3: `workflow_dispatch` live DeviceKit on macOS + booted sim
+- No Linux job (macOS-only host assumption for this module)
 
 ---
 
@@ -329,23 +323,22 @@ No `xq-ios-act devicekit install` in v1.
 
 | # | Decision |
 | --- | --- |
-| D1 | **Python 3.11+** with `pyproject.toml` + `src/xq_ios_act/` |
-| D2 | iOS: WebSocket JSON-RPC; Android future: HTTP JSON-RPC via `adb forward` |
-| D3 | v1 = flat typer verbs; no REPL |
+| D1 | **Swift 5.9+** SPM — library `XqIosAct` + executable `xq-ios-act` |
+| D2 | WebSocket for all RPC; HTTP only for `health` |
+| D3 | v1 = flat ArgumentParser verbs; no REPL |
 | D4 | Vibium-shaped `map` / `@ref` / `diff map` + `rpc` escape hatch |
-| D5 | `DeviceKitTransport` Protocol + `MapStore` from day one (Android-ready) |
-| D6 | `--json` envelope `{"ok", "result", "error"}` (Vibium-compatible) |
-| D7 | `scripts/run-all.sh` → `pytest` + TSR |
+| D5 | `DeviceKitTransport` protocol + `MapStore` |
+| D6 | `--json` envelope with raw DeviceKit `result` |
+| D7 | `scripts/run-all.sh` → `swift test` + TSR |
 | D8 | DeviceKit lifecycle document-only in v1 |
-| D9 | Sync Python v1 (`def kit_call`); async later if needed |
+| D9 | Android = separate module later (not shared Swift codebase) |
 
 ---
 
 ## Open items for product-lead / user
 
-1. **Confirm Vibium-shaped UX** — flat verbs + `map` → `@ref` → `tap` → `diff map` as primary agent loop?
-2. **Screenshot output** — `--json` inline base64 + optional `-o PATH` for PNG file?
-3. **Discard premature PR #8** — re-implement from updated design?
+1. **Screenshot output** — `--json` inline base64 + optional `-o PATH` for PNG file?
+2. **Discard premature PR #8** — re-implement from Swift + Vibium-shaped design?
 
 ---
 
