@@ -7,7 +7,7 @@
 
 ## Goal
 
-Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Swift CLI** that controls and inspects iOS simulators and devices through **Mobile Next DeviceKit** over **WebSocket JSON-RPC**. Agents get stable verbs, `--json` output, predictable exit codes, and copy-pasteable verification — without MobileCLI as the control plane.
+Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Python CLI** that controls and inspects iOS simulators/devices through **Mobile Next DeviceKit** over **WebSocket JSON-RPC**, with a transport layer designed for a future **Android** backend.
 
 ## Non-goals
 
@@ -106,8 +106,8 @@ cd checkouts/xq-versastack/modules/xq-ios-act-cli
 
 | Role | Package | Ownership |
 | --- | --- | --- |
-| dev | CLI + JSON-RPC client + module README | `Sources/**`, `Package.swift` |
-| test | unit/static verify + TSR | `Tests/**`, `scripts/**` |
+| dev | CLI + JSON-RPC client + module README | `src/**`, `pyproject.toml` |
+| test | pytest + static verify + TSR | `tests/**`, `scripts/**` |
 | devops | macOS CI workflow | `.github/workflows/ci-xq-ios-act-cli.yml` |
 
 ### WP2 — agent skill (likely follow-on)
