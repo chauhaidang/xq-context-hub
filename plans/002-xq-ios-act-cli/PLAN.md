@@ -7,7 +7,7 @@
 
 ## Goal
 
-Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Python CLI** that controls and inspects iOS simulators/devices through **Mobile Next DeviceKit** over **WebSocket JSON-RPC**, with Vibium-shaped flat verbs and a transport layer designed for a future **Android** backend.
+Ship `modules/xq-ios-act-cli/` in `xq-versastack`: **dual clients** (Python primary + optional Swift) for a **stateful, agent-native CLI** that controls iOS simulators/devices through **DeviceKit** over **WebSocket JSON-RPC**, with the same Vibium-shaped contract and Python transport layer for a future **Android** backend.
 
 ## Non-goals
 
@@ -15,7 +15,8 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Py
 - MobileCLI as the runtime API (optional ops helper only, documented later)
 - MJPEG/H264 streaming helpers in v1 (RPC-thin first)
 - Changes to `xq-harness` or hub org glossaries
-- Android backend implementation in v1 (shared Python core only)
+- Android backend in v1 (Python transport follow-on)
+- Requiring both clients on PATH at once (pick Python **or** Swift)
 - Implementation before this plan is approved by user/product-lead
 
 ## Before / After
@@ -23,7 +24,7 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Py
 | Aspect | Before | After |
 | --- | --- | --- |
 | Behavior | Research only (`docs/research/xq-ios-act-cli.md`) | Shipped module with documented CLI, tests, CI |
-| Surfaces | No CLI | `xq-ios-act` console script with Vibium-shaped flat verbs (see [`DESIGN.md`](DESIGN.md)) |
+| Surfaces | No CLI | `xq-ios-act` via **Python** (`uv tool`) or **Swift** (`swift build`) — same verbs |
 | Evidence | None | Module `tsr/` + CI workflow scoped to the module |
 
 ## Test approach
@@ -52,12 +53,14 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Py
 
 _(Draft — finalize after open questions below.)_
 
-- [ ] `modules/xq-ios-act-cli/` with `pyproject.toml`, `uv.lock`, CLI, tests, README
-- [ ] README: prerequisites (uv, DeviceKit on iOS; Xcode for sim), install (`uv tool install` / `uv sync` for dev), usage, exact verification commands
-- [ ] Agent-native CLI: `--help` with examples, **JSON by default**, `--pretty` for humans, non-interactive flags, actionable errors
-- [ ] `[project.scripts]` entry `xq-ios-act` — installable via `uv tool install`
+- [ ] `modules/xq-ios-act-cli/` with `python/` (pyproject, uv.lock) and `swift/` (Package.swift), tests, README
+- [ ] README: both clients; prerequisites; `uv tool install` (Python) and `swift build` (Swift)
+- [ ] Agent-native CLI contract: **JSON by default**, `--pretty`, same verbs/exit codes in **both** clients
+- [ ] Python: `[project.scripts]` + `uv tool install xq-ios-act`
+- [ ] Swift: `xq-ios-act` executable via SPM; `swift test` on macOS
+- [ ] Vibium-shaped command tree in both clients
 - [ ] Default verification passes **without** live DeviceKit
-- [ ] `.github/workflows/ci-xq-ios-act-cli.yml` runs documented checks (Linux default, path-filtered)
+- [ ] CI: Linux (Python) + macOS (Swift tests)
 - [ ] Root `README.md`, `modules/README.md`, `CONSUMER_CONTEXT.md` updated when module ships
 - [ ] Research doc status updated when module ships
 
@@ -68,22 +71,24 @@ _(Draft — finalize after open questions below.)_
 
 ### Interfaces / seams _(draft)_
 
-1. **CLI** — `xq-ios-act` console script (`pyproject.toml` `[project.scripts]`); **Google Fire** dispatch
-2. **Library** — `xq_ios_act` package: `DeviceKitTransport`, `kit_call()`, `MapStore`, JSON-RPC codec
-3. **Packaging** — **uv** + `pyproject.toml` + committed `uv.lock`
-4. **Distribution** — **`uv tool install xq-ios-act`** (`[project.scripts]`); publish via `uv build` + `uv publish` when on index
-5. **Runtime dependency** — DeviceKit reachable at documented default `http://127.0.0.1:12004` (not vendored)
-6. **Transport** — WebSocket JSON-RPC for RPC; HTTP acceptable for `/health` only
-7. **Verification** — module-owned scripts in `scripts/`
-8. **CI** — full root workflow `.github/workflows/ci-xq-ios-act-cli.yml`, path-scoped to module
+1. **CLI contract** — same verbs, flags, JSON envelope, exit codes (Python Fire + Swift ArgumentParser)
+2. **Python** — `python/src/xq_ios_act/`; `uv tool install`
+3. **Swift (optional)** — `swift/Sources/`; `swift build`
+4. **Packaging** — uv + pyproject (Python); SPM (Swift)
+5. **Distribution** — Python: `uv tool install`; Swift: `swift build -c release`
+6. **Runtime** — DeviceKit @ `http://127.0.0.1:12004` (not vendored)
+7. **Transport** — WebSocket RPC; HTTP `/health` only
+8. **Verification** — `scripts/run-python.sh`, `scripts/run-swift.sh`, `scripts/run-all.sh`
+9. **CI** — Linux + macOS jobs, path-scoped workflow
 
 ### File ownership _(for parallel wave)_
 
 | Role | Owns | Must not touch |
 | --- | --- | --- |
 | design | Contract/seams, command surface decision | Product implementation |
-| dev | `modules/xq-ios-act-cli/src/**`, `pyproject.toml`, `uv.lock`, module `README.md`, consumer pointers | unrelated modules; root runner |
-| test | `modules/xq-ios-act-cli/tests/**`, verify scripts, `tsr/` | `.github/**` |
+| dev (python) | `python/src/**`, `python/pyproject.toml`, `python/uv.lock` | `swift/**` |
+| dev (swift) | `swift/Sources/**`, `swift/Package.swift` | `python/**` |
+| test | `python/tests/**`, `swift/Tests/**`, `scripts/**`, `tsr/` | `.github/**` |
 | devops | `.github/workflows/ci-xq-ios-act-cli.yml` | CLI logic |
 
 ### Acceptance _(draft)_
@@ -96,11 +101,12 @@ _(Draft — finalize after open questions below.)_
 
 ```bash
 cd checkouts/xq-versastack/modules/xq-ios-act-cli
-uv sync --all-extras
-uv run xq-ios-act health
-uv tool install -e . && xq-ios-act health   # verify tool install path
-bash scripts/run-all.sh
-# exact commands = module README (written by dev/test)
+bash scripts/run-python.sh
+bash scripts/run-swift.sh          # macOS
+# Python install path:
+cd python && uv sync --all-extras && uv run xq-ios-act health
+# Swift install path:
+cd swift && swift build && .build/debug/xq-ios-act health
 ```
 
 ## Work packages
@@ -111,13 +117,21 @@ bash scripts/run-all.sh
 - **Design artifact**: [`DESIGN.md`](DESIGN.md) — CLI surface, tech stack, architecture, seams
 - **Done when**: open questions resolved; acceptance criteria locked; plan status → `ready`
 
-### WP1 — parallel wave (after approval)
+### WP1 — Python (after approval)
 
 | Role | Package | Ownership |
 | --- | --- | --- |
-| dev | CLI + JSON-RPC client + module README | `src/**`, `pyproject.toml`, `uv.lock` |
-| test | pytest + static verify + TSR | `tests/**`, `scripts/**` |
-| devops | Linux CI workflow (+ optional macOS live gate) | `.github/workflows/ci-xq-ios-act-cli.yml` |
+| dev | Fire CLI + JSON-RPC client | `python/src/**`, `python/pyproject.toml` |
+| test | pytest + static verify | `python/tests/**` |
+| devops | Linux CI job | workflow |
+
+### WP1b — Swift optional (parallel or immediately after Python)
+
+| Role | Package | Ownership |
+| --- | --- | --- |
+| dev | ArgumentParser CLI + client | `swift/Sources/**`, `swift/Package.swift` |
+| test | `swift test` + contract parity checks | `swift/Tests/**` |
+| devops | macOS CI job | workflow |
 
 ### WP2 — agent skill (likely follow-on)
 
@@ -140,20 +154,18 @@ bash scripts/run-all.sh
 | 5 | **Agent skill in v1?** | Ship with module vs follow-on | **Follow-on** (match scout-kit maturity path) |
 | 6 | **Live CI gate** | Default CI unit-only vs optional `workflow_dispatch` live DeviceKit | **Unit-only default**; live gate optional WP3 on macOS |
 | 7 | **Screenshot in v1** | Convenience `screenshot` vs `rpc` only | **Convenience wrapper** — default JSON base64 in `result` + optional `-o PATH`; `--pretty` shows summary |
-| 8 | **Language / tooling** | Swift vs Python; Typer vs Fire; pip vs uv | **Python 3.14**, **uv** + **pyproject.toml**, **Google Fire** _(locked)_ |
-| 9 | **Distribution** | `uv tool` vs shiv/pex vs PyInstaller binary | **`uv tool install`** + `uv publish` when indexed _(locked)_ |
+| 8 | **Clients** | Python only vs Python + Swift | **Both** — Python primary, Swift optional _(locked)_ |
+| 9 | **Python distribution** | `uv tool` vs binary bundle | **`uv tool install`** _(locked)_ |
+| 10 | **Swift in v1?** | WP1 vs WP1b | **WP1b** — same contract; parallel if capacity |
 
 ## Notes / decisions
 
-- **Language (locked):** Python 3.14, Google Fire, httpx, websockets, pytest — see [`DESIGN.md`](DESIGN.md) § Tech stack
-- **Packaging (locked):** uv + `pyproject.toml` + `uv.lock`
-- **Distribution (locked):** `uv tool install xq-ios-act`; `uvx` for one-shot; `uv build` + `uv publish` when on PyPI/index
+- **Clients (locked):** Python 3.14 (primary, Fire, uv tool) + Swift 5.9+ (optional, ArgumentParser, swift build)
+- **Shared:** CLI contract only — no shared source; same `~/.xq-ios-act/` state
+- **Distribution:** Python `uv tool install`; Swift `swift build -c release`
 - **Agent UX (locked):** Vibium-shaped flat verbs — see [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
-- **Android path:** shared `xq_ios_act` JSON-RPC/transport core; Android transport in follow-on (not v1)
-- Research source: `checkouts/xq-versastack/docs/research/xq-ios-act-cli.md`
-- Prior versastack structure: [`plans/001-versastack-fast-delivery/PLAN.md`](../001-versastack-fast-delivery/PLAN.md) (module independence, per-module CI)
-- Reference module pattern: `modules/xq-scout-kit` (verify scripts, `tsr/`, path-scoped CI)
-- **Premature work:** Swift scaffold on versastack PR #8 predates approved design — **discard and re-implement in Python** after approval
+- **Android path:** Python `xq_ios_act` transport only (follow-on)
+- **Premature work:** versastack PR #8 Swift scaffold → rebase into `swift/` subdirectory
 
 ## Sequencing
 

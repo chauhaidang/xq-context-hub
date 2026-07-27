@@ -8,15 +8,22 @@
 
 ## Summary
 
-`xq-ios-act` is a **host-side Python CLI** that speaks **DeviceKit JSON-RPC over WebSocket**. It gives coding agents stable JSON output by default, optional `--pretty` for humans, and predictable exit codes — without MobileCLI as the control plane.
+`xq-ios-act` is a **host-side CLI** (Python and optional Swift clients) that speaks **DeviceKit JSON-RPC over WebSocket**. It gives coding agents stable JSON output by default, optional `--pretty` for humans, and predictable exit codes — without MobileCLI as the control plane.
 
-**Language (locked):** **Python 3.14** — fast iteration, strong test ergonomics, and a transport/JSON-RPC layer that can be **shared with a future Android client** ([devicekit-android](https://github.com/mobile-next/devicekit-android) uses the same JSON-RPC methods over HTTP via `adb forward`).
+**Clients (locked):**
 
-**Packaging (locked):** **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** + **`uv.lock`** — `uv sync` for dev, **`uv tool install`** for distribution.
+| Client | Role | Distribution |
+| --- | --- | --- |
+| **Python 3.14** (primary) | Default for agents, Android path, Linux CI | **`uv tool install xq-ios-act`** |
+| **Swift 5.9+** (optional) | macOS-native alternative; Xcode/sim toolchain alignment | **`swift build`** → `.build/release/xq-ios-act` |
 
-**CLI (locked):** **[Google Fire](https://github.com/google/python-fire)** — flat methods as verbs; nested component for `diff map`.
+Both clients implement the **same CLI contract** (verbs, flags, JSON envelope, exit codes, `~/.xq-ios-act/` state). Install **one** on `PATH` — not both as `xq-ios-act` simultaneously.
 
-**Distribution (locked):** **`uv tool install xq-ios-act`** — publishable wheel via `uv build` / `uv publish`; no single-file binary or PyInstaller in v1.
+**Packaging (Python, locked):** **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** + **`uv.lock`**.
+
+**CLI (Python, locked):** **[Google Fire](https://github.com/google/python-fire)**.
+
+**CLI (Swift, locked):** **[swift-argument-parser](https://github.com/apple/swift-argument-parser)** — same flat verb tree as Python.
 
 **Agent UX (locked):** Vibium-shaped flat verbs — `map` → `@ref` → `tap` → `diff map` (see [VIBIUM-BENCHMARK.md](VIBIUM-BENCHMARK.md)).
 
@@ -30,152 +37,126 @@
 | --- | --- |
 | DeviceKit runs on sim/device as XCUITest server | CLI is a **host-side client**; we do not vendor or embed DeviceKit |
 | Agents need headless, composable tools | **JSON by default**; `--pretty` for humans; examples on `--help` |
-| Versastack module independence | **`pyproject.toml`** + **`uv.lock`** + module-local verify + path-scoped CI |
-| Future Android parity | Keep JSON-RPC codec, transport protocol, `MapStore`, and output envelope **platform-agnostic** in `xq_ios_act/` |
+| Versastack module independence | **`python/`** + **`swift/`** subdirs; module-local verify + path-scoped CI |
+| Future Android parity | Python `xq_ios_act` transport/core; Swift iOS-only |
 | FSL-1.1 DeviceKit license | Document runtime dependency; no source bundling |
 
 ---
 
 ## Tech stack
 
-| Layer | Choice | Alternatives considered | Why this choice |
-| --- | --- | --- | --- |
-| Language | **Python 3.14** | Swift, Go, 3.11+ | User decision; shared client core for iOS + future Android |
-| Packaging | **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** + **`uv.lock`** | pip, Poetry, shiv/pex | Fast sync/lock; **`uv tool install`** for agent/user distribution |
-| CLI framework | **[Google Fire](https://github.com/google/python-fire)** | Typer, Click | Flat method-per-verb mapping; minimal boilerplate |
-| WebSocket transport | **[websockets](https://github.com/python-websockets/websockets)** | websocket-client | Async-native; one `asyncio.run()` per command |
-| HTTP (health) | **[httpx](https://www.python-httpx.org/)** | urllib, requests | Sync health check; clear timeout/error types |
-| JSON | **stdlib `json`** | pydantic | Dynamic RPC params; minimal deps |
-| Concurrency | **`asyncio`** per command | threaded sync WS | Matches `websockets`; keeps CLI code simple |
-| Tests | **pytest** + **pytest-asyncio** | unittest | Fast unit tests; mock transport; `tsr/junit.xml` via pytest |
-| Verify wrappers | **bash in `scripts/`** | Makefile | Matches `xq-scout-kit` pattern |
+### Python client (primary)
 
-### Stdlib vs dependencies
+| Layer | Choice |
+| --- | --- |
+| Language | **Python 3.14** |
+| Packaging | **uv** + `pyproject.toml` + `uv.lock` |
+| CLI | **Google Fire** |
+| WebSocket | **websockets** + `asyncio` |
+| HTTP (health) | **httpx** |
+| Tests | **pytest** + **pytest-asyncio** |
+| Distribution | **`uv tool install xq-ios-act`** |
 
-| Capability | Stdlib | Dependency |
-| --- | --- | --- |
-| JSON-RPC codec | `json`, `dataclasses` / `TypedDict` | — |
-| HTTP health | — | **httpx** |
-| WebSocket RPC | — | **websockets** |
-| File map cache | `pathlib`, `json` | — |
-| CLI parsing + dispatch | — | **fire** |
-| Tests | — | **pytest**, **pytest-asyncio** |
+### Swift client (optional)
 
-**Explicitly not in v1 stack:** MobileCLI, vendored DeviceKit, MJPEG/H264, REPL, MCP server, Android backend implementation, **shiv/pex/PyInstaller/single-file bundles**.
+| Layer | Choice |
+| --- | --- |
+| Language | **Swift 5.9+** |
+| Packaging | **Swift Package Manager** (`Package.swift`) |
+| CLI | **swift-argument-parser** |
+| WebSocket | **URLSessionWebSocketTask** |
+| HTTP (health) | **URLSession** |
+| Tests | **`swift test`** + xunit → `tsr/` |
+| Distribution | **`swift build -c release`**; optional Homebrew formula later |
+
+### Shared contract (both clients)
+
+| Item | Spec |
+| --- | --- |
+| Command tree | § CLI design — identical verbs |
+| Default output | Compact JSON envelope |
+| Human output | `--pretty` |
+| State dir | `~/.xq-ios-act/` (`$XQ_IOS_ACT_STATE_DIR`) |
+| Exit codes | 0 / 2 / 3 / 4 / 5 — same semantics |
+| Transport | WS `/ws` for RPC; HTTP `/health` only |
+
+**Explicitly not in v1:** MobileCLI, vendored DeviceKit, MJPEG/H264, REPL, MCP server, Android in Swift client, shiv/pex/PyInstaller.
 
 ---
 
 ## Distribution
 
-**End-user and agent install (locked):** [`uv tool install`](https://docs.astral.sh/uv/guides/tools/)
+### Python (primary)
+
+**End-user and agent install:** [`uv tool install`](https://docs.astral.sh/uv/guides/tools/)
 
 ```bash
-# After publish to PyPI (or private index)
 uv tool install xq-ios-act
 xq-ios-act health
-
-# One-shot without global install
-uvx xq-ios-act health
+uvx xq-ios-act health              # one-shot
 ```
 
-**Local / monorepo dev:**
+**Local dev:**
 
 ```bash
-cd modules/xq-ios-act-cli
+cd modules/xq-ios-act-cli/python
 uv sync --all-extras
-uv run xq-ios-act health          # project venv
-uv tool install -e .              # optional: install into uv tool env for PATH testing
+uv run xq-ios-act health
 ```
 
-**Publish path (when module ships publicly):**
+**Publish:** `uv build --no-sources` → `uv publish` (when on PyPI/index).
+
+### Swift (optional)
+
+**macOS dev / install:**
 
 ```bash
-uv version --bump patch           # optional
-uv build --no-sources
-uv publish                        # PyPI or [[tool.uv.index]] with publish-url
+cd modules/xq-ios-act-cli/swift
+swift build -c release
+.build/release/xq-ios-act health
+# optional: cp .build/release/xq-ios-act ~/.local/bin/
 ```
 
-`pyproject.toml` must declare the console script:
+No `uv tool` path for Swift. README documents when to prefer Swift (macOS-only, no Python/uv, Xcode toolchain already present).
 
-```toml
-[project.scripts]
-xq-ios-act = "xq_ios_act.app:main"
-```
+### Choosing a client
 
-**Prerequisites for users:** [uv](https://docs.astral.sh/uv/) installed (uv manages Python 3.14 via `uv python install` if needed). DeviceKit on sim/device is separate (documented in README).
+| Prefer Python when… | Prefer Swift when… |
+| --- | --- |
+| Agents, cross-platform dev, future Android | macOS-only, native binary feel |
+| `uv tool install` workflow | Already in Swift/iOS workflow |
+| Linux CI for unit tests | No Python/uv on machine |
 
-**Not v1:** standalone binaries, `.pyz` zipapps, bundling the Python interpreter into one artifact.
+**Not v1:** bundling Python into a single binary; Swift Homebrew tap (follow-on).
 
 ---
 
-## Architecture
-
-### Layer diagram
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│  xq-ios-act (console script / uv run)                        │
-│  Fire · flat methods: map, tap, screenshot, rpc              │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-┌──────────────────────────▼──────────────────────────────────┐
-│  xq_ios_act (library package)                                │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐ │
-│  │ output      │  │ kit_call()   │  │ DeviceKitClient     │ │
-│  └─────────────┘  └──────────────┘  └──────────┬──────────┘ │
-│  ┌─────────────┐  ┌──────────────┐             │            │
-│  │ jsonrpc     │  │ MapStore     │             │            │
-│  └─────────────┘  └──────────────┘             │            │
-└────────────────────────────────────────────────┼────────────┘
-                                                 │
-                    ┌────────────────────────────▼────────────┐
-                    │  DeviceKitTransport (Protocol)           │
-                    │  · WebSocketTransport (production)       │
-                    │  · MockTransport (unit tests)            │
-                    └────────────────────────────┬────────────┘
-                                                 │
-                    ┌────────────────────────────▼────────────┐
-                    │  devicekit-ios (external)                │
-                    │  GET /health · WS /ws JSON-RPC 2.0       │
-                    └──────────────────────────────────────────┘
-```
-
-### Package layout (target)
+### Module layout (dual client)
 
 ```text
 modules/xq-ios-act-cli/
-  pyproject.toml                 # requires-python >=3.14; [project.scripts]
-  uv.lock
-  README.md
-  src/xq_ios_act/
-    __init__.py
-    __main__.py                  # fire.Fire(...) entry when run as module
-    app.py                       # Fire surface: XqIosAct + Diff components
-    commands/                    # verb implementations (Vibium pattern)
-      health.py
-      map_cmd.py                 # `map` — avoid shadowing builtin
-      tap.py
-      ...
-    jsonrpc.py
-    urls.py
-    errors.py
-    transport.py                 # DeviceKitTransport Protocol
-    websocket_transport.py
-    mock_transport.py
-    client.py
-    map_store.py
-    output.py
-    kit_call.py
-    config.py                    # base_url, timeout, pretty — shared CLI config
-  tests/
-    test_jsonrpc.py
-    test_transport.py
-    ...
+  README.md                      # both clients; when to use which
   scripts/
-    run-static.sh
-    run-all.sh                   # uv run pytest + tsr/
+    run-all.sh                   # python tests + swift test (macOS)
+    run-python.sh
+    run-swift.sh                 # macOS only; skip gracefully on Linux CI
   tsr/
+  python/
+    pyproject.toml
+    uv.lock
+    src/xq_ios_act/              # Fire CLI + library
+    tests/
+  swift/
+    Package.swift
+    Sources/
+      XqIosAct/                  # library
+      xq-ios-act/                # executable + Commands/
+    Tests/
 ```
+
+**No shared source code** between Python and Swift — **shared CLI contract** only (documented in this design). Optional `contract/` fixtures later: golden JSON outputs per command.
+
+### Python architecture
 
 **Fire wiring (sketch):**
 
@@ -198,9 +179,13 @@ def main():
     fire.Fire({"": root, "diff": Diff(root)})
 ```
 
-**Android later:** extend `xq_ios_act` with an Android transport (HTTP via `adb forward`) or a thin `xq-android-act` module that imports the shared package — same JSON-RPC surface, different default base URL.
+**Android later:** Python `xq_ios_act` only.
 
-### Core seams (for dev / test parallel wave)
+### Swift architecture
+
+Same layers as Python: `XqIosAct` library + `xq-ios-act` executable, `DeviceKitTransport` protocol, `MapStore`, `kitCall()`. Mirror Python seams; no code sharing.
+
+### Core seams (Python)
 
 ```python
 class DeviceKitTransport(Protocol):
@@ -213,6 +198,18 @@ async def kit_call(method: str, params: Any | None = None) -> Any: ...
 
 class MapStore:
     """Last map + @ref table on disk under ~/.xq-ios-act/."""
+```
+
+### Core seams (Swift)
+
+```swift
+protocol DeviceKitTransport: Sendable {
+    func fetchHealth() async throws -> HealthResult
+    func call(method: String, params: JSONValue?, id: Int) async throws -> JSONRPCResponse
+}
+
+func kitCall(_ method: String, params: JSONValue? = nil) async throws -> JSONValue
+struct MapStore { /* same paths as Python */ }
 ```
 
 ---
@@ -229,7 +226,9 @@ class MapStore:
 
 **Env overrides (optional v1):** `XQ_IOS_ACT_BASE_URL`, `XQ_IOS_ACT_TIMEOUT`
 
-**Fire note:** global flags are **constructor kwargs** on the root component (`xq-ios-act --base-url=… health`). Document canonical examples in README.
+**Fire note (Python):** global flags are constructor kwargs (`xq-ios-act --base-url=… health`).
+
+**ArgumentParser note (Swift):** same global flags on root command (`xq-ios-act --base-url … health`).
 
 **Output rule:** stdout is always **one structured result per command**. Default = compact JSON; `--pretty` = concise human summary. Agents never need a flag to parse output.
 
@@ -385,25 +384,24 @@ No `xq-ios-act devicekit install` in v1.
 
 | Layer | What | DeviceKit required? |
 | --- | --- | --- |
-| Unit | JSON codec, URL builders, exit codes, mock transport | No |
-| Static | `--help` / README examples, contract strings | No (`uv sync` only) |
-| Integration (opt-in) | Live RPC against running DeviceKit | Yes — `XQ_IOS_ACT_LIVE=1` |
-| CI default | unit + static via `scripts/run-all.sh` | No |
-| CI optional WP3 | `workflow_dispatch` live job on macOS + booted sim | Yes |
+| Unit (Python) | JSON codec, mock transport, exit codes | No |
+| Unit (Swift) | JSON codec, mock transport, exit codes | No |
+| Static | `--help` / README contract | No |
+| Contract (opt-in) | Same golden commands, Python vs Swift on macOS | No (mock) / Yes (live) |
+| Integration (opt-in) | Live RPC | Yes — `XQ_IOS_ACT_LIVE=1` |
+| CI default | Python unit + static on **Linux** | No |
+| CI Swift | `swift test` on **macos-14** | No |
+| CI live (WP3) | DeviceKit on macOS | Yes |
 
-**Mock transport fixture:** canned responses for `device.info`, error `-32601`, connection failure injection.
-
-**TSR:** `uv run pytest --junitxml=tsr/junit.xml`; `tsr/summary.md` with test count.
-
-**CI runner advantage:** default unit/static CI can run on **Linux** (no Xcode required); live DeviceKit gate stays on **macOS**.
+**TSR:** pytest junit + swift xunit merged under `tsr/`.
 
 ---
 
 ## CI / devops notes (for parallel wave)
 
-- **Default CI:** `ubuntu-latest` — install uv, `uv sync --all-extras`, `bash scripts/run-all.sh`
-- Pin **Python 3.14** in CI (`uv python install 3.14` or `setup-python` + uv)
-- **Optional live gate (WP3):** `macos-14` + booted sim + DeviceKit
+- **Linux job:** `cd python && uv sync --all-extras && bash ../scripts/run-python.sh`
+- **macOS job:** Python smoke + `cd swift && swift test` via `scripts/run-swift.sh`
+- **Optional live gate (WP3):** macos-14 + booted sim + DeviceKit (either client)
 - Trigger paths: `modules/xq-ios-act-cli/**`, `.github/workflows/ci-xq-ios-act-cli.yml`
 
 ---
@@ -414,7 +412,8 @@ No `xq-ios-act devicekit install` in v1.
 | --- | --- |
 | `skills/xq-ios-act/SKILL.md` | WP2 — after CLI stabilizes |
 | `session` / REPL | v2 |
-| Android transport (`adb forward` + devicekit-android) | v1.1+ — reuse `xq_ios_act` core |
+| Android transport (Python only) | v1.1+ |
+| Swift Homebrew tap | follow-on |
 | `io swipe`, `orientation`, `device.url` wrappers | v1.1 or via `rpc` |
 | MJPEG/H264 stream helpers | separate commands or docs-only |
 | DeviceKit sim launcher script | if document-only proves insufficient |
@@ -425,23 +424,24 @@ No `xq-ios-act devicekit install` in v1.
 
 | # | Decision |
 | --- | --- |
-| D1 | **Python 3.14** — `uv` + `pyproject.toml` + `uv.lock`; package `xq_ios_act` + script `xq-ios-act` |
+| D1 | **Dual client:** Python 3.14 (primary) + Swift 5.9+ (optional); same CLI contract |
 | D2 | WebSocket for all RPC; HTTP only for `health` |
-| D3 | v1 = flat **Fire** methods; nested `diff map`; no REPL |
+| D3 | Python = Fire; Swift = ArgumentParser; same flat verbs |
 | D4 | Vibium-shaped `map` / `@ref` / `diff map` + `rpc` escape hatch |
-| D5 | `DeviceKitTransport` protocol + `MapStore` |
-| D6 | **JSON envelope by default**; `--pretty` for human stdout |
-| D7 | `scripts/run-all.sh` → `pytest` + TSR |
-| D8 | DeviceKit lifecycle document-only in v1 |
-| D9 | Android = shared Python transport/core later (not v1 scope) |
-| D10 | **Distribution via `uv tool install`**; `uv build` + `uv publish` when on PyPI; no binary bundler in v1 |
+| D5 | `DeviceKitTransport` + `MapStore` per language (no shared code) |
+| D6 | **JSON by default**; `--pretty` for human stdout (both clients) |
+| D7 | `python/` + `swift/` subdirs under one module |
+| D8 | Python dist: **`uv tool install`**; Swift dist: **`swift build`** |
+| D9 | Android = Python transport only (follow-on) |
+| D10 | DeviceKit lifecycle document-only in v1 |
 
 ---
 
 ## Open items for product-lead / user
 
 1. **Screenshot output** — default JSON includes base64 in `result`; optional `-o PATH` writes PNG file; `--pretty` prints path/summary?
-2. **Discard premature versastack PR #8** — Swift scaffold predates approved design; re-implement in Python after approval?
+2. **Swift in v1 scope?** — ship with Python in WP1, or WP1b immediately after? _(recommend: WP1b parallel if capacity)_
+3. **Discard/rebase versastack PR #8** — move Swift scaffold into `swift/` per this layout
 
 ---
 
