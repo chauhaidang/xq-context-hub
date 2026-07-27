@@ -12,9 +12,11 @@
 
 **Language (locked):** **Python 3.14** — fast iteration, strong test ergonomics, and a transport/JSON-RPC layer that can be **shared with a future Android client** ([devicekit-android](https://github.com/mobile-next/devicekit-android) uses the same JSON-RPC methods over HTTP via `adb forward`).
 
-**Packaging (locked):** **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** — `uv sync`, `uv run`, committed `uv.lock`.
+**Packaging (locked):** **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** + **`uv.lock`** — `uv sync` for dev, **`uv tool install`** for distribution.
 
 **CLI (locked):** **[Google Fire](https://github.com/google/python-fire)** — flat methods as verbs; nested component for `diff map`.
+
+**Distribution (locked):** **`uv tool install xq-ios-act`** — publishable wheel via `uv build` / `uv publish`; no single-file binary or PyInstaller in v1.
 
 **Agent UX (locked):** Vibium-shaped flat verbs — `map` → `@ref` → `tap` → `diff map` (see [VIBIUM-BENCHMARK.md](VIBIUM-BENCHMARK.md)).
 
@@ -39,7 +41,7 @@
 | Layer | Choice | Alternatives considered | Why this choice |
 | --- | --- | --- | --- |
 | Language | **Python 3.14** | Swift, Go, 3.11+ | User decision; shared client core for iOS + future Android |
-| Packaging | **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** | pip, Poetry, hatch | Fast sync/lock; `uv run` for dev and CI |
+| Packaging | **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** + **`uv.lock`** | pip, Poetry, shiv/pex | Fast sync/lock; **`uv tool install`** for agent/user distribution |
 | CLI framework | **[Google Fire](https://github.com/google/python-fire)** | Typer, Click | Flat method-per-verb mapping; minimal boilerplate |
 | WebSocket transport | **[websockets](https://github.com/python-websockets/websockets)** | websocket-client | Async-native; one `asyncio.run()` per command |
 | HTTP (health) | **[httpx](https://www.python-httpx.org/)** | urllib, requests | Sync health check; clear timeout/error types |
@@ -59,7 +61,50 @@
 | CLI parsing + dispatch | — | **fire** |
 | Tests | — | **pytest**, **pytest-asyncio** |
 
-**Explicitly not in v1 stack:** MobileCLI, vendored DeviceKit, MJPEG/H264, REPL, MCP server, Android backend implementation.
+**Explicitly not in v1 stack:** MobileCLI, vendored DeviceKit, MJPEG/H264, REPL, MCP server, Android backend implementation, **shiv/pex/PyInstaller/single-file bundles**.
+
+---
+
+## Distribution
+
+**End-user and agent install (locked):** [`uv tool install`](https://docs.astral.sh/uv/guides/tools/)
+
+```bash
+# After publish to PyPI (or private index)
+uv tool install xq-ios-act
+xq-ios-act health
+
+# One-shot without global install
+uvx xq-ios-act health
+```
+
+**Local / monorepo dev:**
+
+```bash
+cd modules/xq-ios-act-cli
+uv sync --all-extras
+uv run xq-ios-act health          # project venv
+uv tool install -e .              # optional: install into uv tool env for PATH testing
+```
+
+**Publish path (when module ships publicly):**
+
+```bash
+uv version --bump patch           # optional
+uv build --no-sources
+uv publish                        # PyPI or [[tool.uv.index]] with publish-url
+```
+
+`pyproject.toml` must declare the console script:
+
+```toml
+[project.scripts]
+xq-ios-act = "xq_ios_act.app:main"
+```
+
+**Prerequisites for users:** [uv](https://docs.astral.sh/uv/) installed (uv manages Python 3.14 via `uv python install` if needed). DeviceKit on sim/device is separate (documented in README).
+
+**Not v1:** standalone binaries, `.pyz` zipapps, bundling the Python interpreter into one artifact.
 
 ---
 
@@ -389,6 +434,7 @@ No `xq-ios-act devicekit install` in v1.
 | D7 | `scripts/run-all.sh` → `pytest` + TSR |
 | D8 | DeviceKit lifecycle document-only in v1 |
 | D9 | Android = shared Python transport/core later (not v1 scope) |
+| D10 | **Distribution via `uv tool install`**; `uv build` + `uv publish` when on PyPI; no binary bundler in v1 |
 
 ---
 
