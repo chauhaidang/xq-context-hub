@@ -92,11 +92,12 @@ Refs are **stable within a page state**; agents re-map after navigation/DOM chan
 | Flag | Purpose |
 | --- | --- |
 | `--json` (opt-in) | `{"ok":true,"result":"..."}` / `{"ok":false,"error":"..."}` |
-| Human mode | Plain text only |
-
-**Our deviation:** JSON **by default**; `--pretty` for human text (agent-first).
 | `--headless` | Runtime mode |
 | `-v` | Debug logging |
+
+Human mode (no `--json`) prints plain text only.
+
+**Our deviation:** JSON **by default**; `--pretty` for human text (agent-first).
 
 ### Optional navigate-then-act
 

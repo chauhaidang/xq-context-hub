@@ -10,7 +10,11 @@
 
 `xq-ios-act` is a **host-side Python CLI** that speaks **DeviceKit JSON-RPC over WebSocket**. It gives coding agents stable JSON output by default, optional `--pretty` for humans, and predictable exit codes — without MobileCLI as the control plane.
 
-**Language (locked):** **Python 3.11+** — fast iteration, strong test ergonomics, and a transport/JSON-RPC layer that can be **shared with a future Android client** ([devicekit-android](https://github.com/mobile-next/devicekit-android) uses the same JSON-RPC methods over HTTP via `adb forward`).
+**Language (locked):** **Python 3.14** — fast iteration, strong test ergonomics, and a transport/JSON-RPC layer that can be **shared with a future Android client** ([devicekit-android](https://github.com/mobile-next/devicekit-android) uses the same JSON-RPC methods over HTTP via `adb forward`).
+
+**Packaging (locked):** **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** — `uv sync`, `uv run`, committed `uv.lock`.
+
+**CLI (locked):** **[Google Fire](https://github.com/google/python-fire)** — flat methods as verbs; nested component for `diff map`.
 
 **Agent UX (locked):** Vibium-shaped flat verbs — `map` → `@ref` → `tap` → `diff map` (see [VIBIUM-BENCHMARK.md](VIBIUM-BENCHMARK.md)).
 
@@ -24,7 +28,7 @@
 | --- | --- |
 | DeviceKit runs on sim/device as XCUITest server | CLI is a **host-side client**; we do not vendor or embed DeviceKit |
 | Agents need headless, composable tools | **JSON by default**; `--pretty` for humans; examples on `--help` |
-| Versastack module independence | `pyproject.toml` + module-local verify + path-scoped CI only |
+| Versastack module independence | **`pyproject.toml`** + **`uv.lock`** + module-local verify + path-scoped CI |
 | Future Android parity | Keep JSON-RPC codec, transport protocol, `MapStore`, and output envelope **platform-agnostic** in `xq_ios_act/` |
 | FSL-1.1 DeviceKit license | Document runtime dependency; no source bundling |
 
@@ -34,9 +38,9 @@
 
 | Layer | Choice | Alternatives considered | Why this choice |
 | --- | --- | --- | --- |
-| Language | **Python 3.11+** | Swift, Go | User decision; shared client core for iOS + future Android |
-| Packaging | **`pyproject.toml`** (hatchling or setuptools) | Poetry | Standard versastack module layout; `pip install -e .` |
-| CLI framework | **[Typer](https://typer.tiangolo.com/)** | Click, argparse | Layered `--help`, subcommands, examples; Click-compatible |
+| Language | **Python 3.14** | Swift, Go, 3.11+ | User decision; shared client core for iOS + future Android |
+| Packaging | **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** | pip, Poetry, hatch | Fast sync/lock; `uv run` for dev and CI |
+| CLI framework | **[Google Fire](https://github.com/google/python-fire)** | Typer, Click | Flat method-per-verb mapping; minimal boilerplate |
 | WebSocket transport | **[websockets](https://github.com/python-websockets/websockets)** | websocket-client | Async-native; one `asyncio.run()` per command |
 | HTTP (health) | **[httpx](https://www.python-httpx.org/)** | urllib, requests | Sync health check; clear timeout/error types |
 | JSON | **stdlib `json`** | pydantic | Dynamic RPC params; minimal deps |
@@ -52,7 +56,7 @@
 | HTTP health | — | **httpx** |
 | WebSocket RPC | — | **websockets** |
 | File map cache | `pathlib`, `json` | — |
-| CLI parsing + `--help` | — | **typer** |
+| CLI parsing + dispatch | — | **fire** |
 | Tests | — | **pytest**, **pytest-asyncio** |
 
 **Explicitly not in v1 stack:** MobileCLI, vendored DeviceKit, MJPEG/H264, REPL, MCP server, Android backend implementation.
@@ -65,8 +69,8 @@
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐
-│  xq-ios-act (console script)                                 │
-│  Typer · flat verbs: map, tap, screenshot, rpc               │
+│  xq-ios-act (console script / uv run)                        │
+│  Fire · flat methods: map, tap, screenshot, rpc              │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
@@ -95,12 +99,14 @@
 
 ```text
 modules/xq-ios-act-cli/
-  pyproject.toml
+  pyproject.toml                 # requires-python >=3.14; [project.scripts]
+  uv.lock
   README.md
   src/xq_ios_act/
     __init__.py
-    cli.py                       # Typer root + global options
-    commands/                    # one module per verb (Vibium pattern)
+    __main__.py                  # fire.Fire(...) entry when run as module
+    app.py                       # Fire surface: XqIosAct + Diff components
+    commands/                    # verb implementations (Vibium pattern)
       health.py
       map_cmd.py                 # `map` — avoid shadowing builtin
       tap.py
@@ -115,14 +121,36 @@ modules/xq-ios-act-cli/
     map_store.py
     output.py
     kit_call.py
+    config.py                    # base_url, timeout, pretty — shared CLI config
   tests/
     test_jsonrpc.py
     test_transport.py
     ...
   scripts/
     run-static.sh
-    run-all.sh                   # pytest + tsr/
+    run-all.sh                   # uv run pytest + tsr/
   tsr/
+```
+
+**Fire wiring (sketch):**
+
+```python
+class XqIosAct:
+    def __init__(self, base_url: str = "http://127.0.0.1:12004", timeout: int = 30, pretty: bool = False):
+        self.config = Config(base_url, timeout, pretty)
+
+    def health(self): ...
+    def map(self, out: str | None = None): ...
+    def tap(self, ref: str | None = None, x: int | None = None, y: int | None = None): ...
+    # ...
+
+class Diff:
+    def __init__(self, parent: XqIosAct): ...
+    def map(self): ...
+
+def main():
+    root = XqIosAct()
+    fire.Fire({"": root, "diff": Diff(root)})
 ```
 
 **Android later:** extend `xq_ios_act` with an Android transport (HTTP via `adb forward`) or a thin `xq-android-act` module that imports the shared package — same JSON-RPC surface, different default base URL.
@@ -152,9 +180,11 @@ class MapStore:
 | --- | --- | --- |
 | `--base-url` | `http://127.0.0.1:12004` | DeviceKit HTTP base (WS derived as `/ws`) |
 | `--timeout` | `30` | Per-request seconds |
-| `--pretty` | off | Human-readable stdout (default is compact JSON envelope) |
+| `--pretty` | `False` | Human-readable stdout (default is compact JSON envelope) |
 
 **Env overrides (optional v1):** `XQ_IOS_ACT_BASE_URL`, `XQ_IOS_ACT_TIMEOUT`
+
+**Fire note:** global flags are **constructor kwargs** on the root component (`xq-ios-act --base-url=… health`). Document canonical examples in README.
 
 **Output rule:** stdout is always **one structured result per command**. Default = compact JSON; `--pretty` = concise human summary. Agents never need a flag to parse output.
 
@@ -311,14 +341,14 @@ No `xq-ios-act devicekit install` in v1.
 | Layer | What | DeviceKit required? |
 | --- | --- | --- |
 | Unit | JSON codec, URL builders, exit codes, mock transport | No |
-| Static | `--help` examples, README contract strings | No (`pip install -e .` only) |
+| Static | `--help` / README examples, contract strings | No (`uv sync` only) |
 | Integration (opt-in) | Live RPC against running DeviceKit | Yes — `XQ_IOS_ACT_LIVE=1` |
 | CI default | unit + static via `scripts/run-all.sh` | No |
 | CI optional WP3 | `workflow_dispatch` live job on macOS + booted sim | Yes |
 
 **Mock transport fixture:** canned responses for `device.info`, error `-32601`, connection failure injection.
 
-**TSR:** `pytest --junitxml=tsr/junit.xml`; `tsr/summary.md` with test count.
+**TSR:** `uv run pytest --junitxml=tsr/junit.xml`; `tsr/summary.md` with test count.
 
 **CI runner advantage:** default unit/static CI can run on **Linux** (no Xcode required); live DeviceKit gate stays on **macOS**.
 
@@ -326,7 +356,8 @@ No `xq-ios-act devicekit install` in v1.
 
 ## CI / devops notes (for parallel wave)
 
-- **Default CI:** `ubuntu-latest` — `pip install -e ".[dev]"` + `bash scripts/run-all.sh`
+- **Default CI:** `ubuntu-latest` — install uv, `uv sync --all-extras`, `bash scripts/run-all.sh`
+- Pin **Python 3.14** in CI (`uv python install 3.14` or `setup-python` + uv)
 - **Optional live gate (WP3):** `macos-14` + booted sim + DeviceKit
 - Trigger paths: `modules/xq-ios-act-cli/**`, `.github/workflows/ci-xq-ios-act-cli.yml`
 
@@ -349,9 +380,9 @@ No `xq-ios-act devicekit install` in v1.
 
 | # | Decision |
 | --- | --- |
-| D1 | **Python 3.11+** — package `xq_ios_act` + console script `xq-ios-act` |
+| D1 | **Python 3.14** — `uv` + `pyproject.toml` + `uv.lock`; package `xq_ios_act` + script `xq-ios-act` |
 | D2 | WebSocket for all RPC; HTTP only for `health` |
-| D3 | v1 = flat Typer verbs; no REPL |
+| D3 | v1 = flat **Fire** methods; nested `diff map`; no REPL |
 | D4 | Vibium-shaped `map` / `@ref` / `diff map` + `rpc` escape hatch |
 | D5 | `DeviceKitTransport` protocol + `MapStore` |
 | D6 | **JSON envelope by default**; `--pretty` for human stdout |

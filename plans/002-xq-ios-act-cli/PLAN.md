@@ -52,8 +52,8 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **stateful, agent-native Py
 
 _(Draft — finalize after open questions below.)_
 
-- [ ] `modules/xq-ios-act-cli/` with `pyproject.toml`, CLI, tests, README
-- [ ] README: prerequisites (Python 3.11+, DeviceKit on iOS; Xcode for sim), install (`pip install -e .`), usage, exact verification commands
+- [ ] `modules/xq-ios-act-cli/` with `pyproject.toml`, `uv.lock`, CLI, tests, README
+- [ ] README: prerequisites (Python 3.14, uv, DeviceKit on iOS; Xcode for sim), install (`uv sync`), usage, exact verification commands
 - [ ] Agent-native CLI: `--help` with examples, **JSON by default**, `--pretty` for humans, non-interactive flags, actionable errors
 - [ ] Vibium-shaped v1 command tree: `health`, `map`, `diff map`, `tap`, `type`, `screenshot`, `launch`, `foreground`, `dump`, `rpc`
 - [ ] Default verification passes **without** live DeviceKit
@@ -68,19 +68,20 @@ _(Draft — finalize after open questions below.)_
 
 ### Interfaces / seams _(draft)_
 
-1. **CLI** — `xq-ios-act` console script (`pyproject.toml` entry point)
+1. **CLI** — `xq-ios-act` console script (`pyproject.toml` `[project.scripts]`); **Google Fire** dispatch
 2. **Library** — `xq_ios_act` package: `DeviceKitTransport`, `kit_call()`, `MapStore`, JSON-RPC codec
-3. **Runtime dependency** — DeviceKit reachable at documented default `http://127.0.0.1:12004` (not vendored)
-4. **Transport** — WebSocket JSON-RPC for RPC; HTTP acceptable for `/health` only
-5. **Verification** — module-owned scripts in `scripts/`
-6. **CI** — full root workflow `.github/workflows/ci-xq-ios-act-cli.yml`, path-scoped to module
+3. **Packaging** — **uv** + `pyproject.toml` + committed `uv.lock`
+4. **Runtime dependency** — DeviceKit reachable at documented default `http://127.0.0.1:12004` (not vendored)
+5. **Transport** — WebSocket JSON-RPC for RPC; HTTP acceptable for `/health` only
+6. **Verification** — module-owned scripts in `scripts/`
+7. **CI** — full root workflow `.github/workflows/ci-xq-ios-act-cli.yml`, path-scoped to module
 
 ### File ownership _(for parallel wave)_
 
 | Role | Owns | Must not touch |
 | --- | --- | --- |
 | design | Contract/seams, command surface decision | Product implementation |
-| dev | `modules/xq-ios-act-cli/src/**`, `pyproject.toml`, module `README.md`, consumer pointers | unrelated modules; root runner |
+| dev | `modules/xq-ios-act-cli/src/**`, `pyproject.toml`, `uv.lock`, module `README.md`, consumer pointers | unrelated modules; root runner |
 | test | `modules/xq-ios-act-cli/tests/**`, verify scripts, `tsr/` | `.github/**` |
 | devops | `.github/workflows/ci-xq-ios-act-cli.yml` | CLI logic |
 
@@ -94,7 +95,8 @@ _(Draft — finalize after open questions below.)_
 
 ```bash
 cd checkouts/xq-versastack/modules/xq-ios-act-cli
-pip install -e ".[dev]"
+uv sync --all-extras
+uv run xq-ios-act health
 bash scripts/run-all.sh
 # exact commands = module README (written by dev/test)
 ```
@@ -111,7 +113,7 @@ bash scripts/run-all.sh
 
 | Role | Package | Ownership |
 | --- | --- | --- |
-| dev | CLI + JSON-RPC client + module README | `src/**`, `pyproject.toml` |
+| dev | CLI + JSON-RPC client + module README | `src/**`, `pyproject.toml`, `uv.lock` |
 | test | pytest + static verify + TSR | `tests/**`, `scripts/**` |
 | devops | Linux CI workflow (+ optional macOS live gate) | `.github/workflows/ci-xq-ios-act-cli.yml` |
 
@@ -136,11 +138,12 @@ bash scripts/run-all.sh
 | 5 | **Agent skill in v1?** | Ship with module vs follow-on | **Follow-on** (match scout-kit maturity path) |
 | 6 | **Live CI gate** | Default CI unit-only vs optional `workflow_dispatch` live DeviceKit | **Unit-only default**; live gate optional WP3 on macOS |
 | 7 | **Screenshot in v1** | Convenience `screenshot` vs `rpc` only | **Convenience wrapper** — default JSON base64 in `result` + optional `-o PATH`; `--pretty` shows summary |
-| 8 | **Language** | Swift vs Python vs Go | **Python 3.11+** — user decision _(locked)_ |
+| 8 | **Language / tooling** | Swift vs Python; Typer vs Fire; pip vs uv | **Python 3.14**, **uv** + **pyproject.toml**, **Google Fire** _(locked)_ |
 
 ## Notes / decisions
 
-- **Language (locked):** Python 3.11+, Typer, httpx, websockets, pytest — see [`DESIGN.md`](DESIGN.md) § Tech stack
+- **Language (locked):** Python 3.14, Google Fire, httpx, websockets, pytest — see [`DESIGN.md`](DESIGN.md) § Tech stack
+- **Packaging (locked):** uv + `pyproject.toml` + `uv.lock`
 - **Agent UX (locked):** Vibium-shaped flat verbs — see [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
 - **Android path:** shared `xq_ios_act` JSON-RPC/transport core; Android transport in follow-on (not v1)
 - Research source: `checkouts/xq-versastack/docs/research/xq-ios-act-cli.md`
