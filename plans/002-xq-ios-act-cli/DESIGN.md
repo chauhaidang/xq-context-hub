@@ -80,7 +80,7 @@ Both clients implement the **same CLI contract** (verbs, flags, JSON envelope, e
 | Exit codes | 0 / 2 / 3 / 4 / 5 — same semantics |
 | Transport | WS `/ws` for RPC; HTTP `/health` only |
 
-**Explicitly not in v1:** MobileCLI, vendored DeviceKit, MJPEG/H264, REPL, MCP server, Android in Swift client, shiv/pex/PyInstaller.
+**Explicitly not in v1 stack:** vendored DeviceKit **source**, MobileCLI as install/runtime dependency, MJPEG/H264, REPL, MCP server, Android in Swift client, shiv/pex/PyInstaller.
 
 ---
 
@@ -262,8 +262,9 @@ xq-ios-act [--pretty] [--base-url URL] [--timeout SEC]
   screenshot [-o PATH]
   launch --bundle-id ID
   foreground
-  dump                            # raw device.dump.ui JSON
-  rpc --method NAME [--params JSON]   # escape hatch
+  dump
+  rpc --method NAME [--params JSON]
+  devicekit install [--sim | --device UDID] [--provisioning-profile PATH] ...
 ```
 
 **v1 scope lock (recommended):** commands above + `rpc`. Swipe/gesture/orientation via `rpc` until v1.1.
@@ -382,16 +383,78 @@ Design v1 library so `DeviceKitClient` can accept a **shared transport instance*
 
 ---
 
-## DeviceKit lifecycle (v1)
+## DeviceKit install (v1 — first-party)
 
-**Document-only.** README sections:
+We **own** sign + install. We do **not** vendor DeviceKit source; we fetch **release artifacts** from [devicekit-ios](https://github.com/mobile-next/devicekit-ios) and install with the user's Apple credentials.
 
-1. Build/install DeviceKit on sim or device (link upstream docs)
-2. Start server (XCUITest runner) — default `127.0.0.1:12004`
-3. Real device: port-forward / tunnel (document `ios forward` / MobileCLI as optional ops path)
-4. Point `xq-ios-act --base-url …` at reachable base URL
+**Not using MobileCLI** for install — same outcome, our CLI contract.
 
-No `xq-ios-act devicekit install` in v1.
+### Command surface
+
+```text
+xq-ios-act devicekit install [--sim | --device UDID]
+  [--provisioning-profile PATH]   # required for real device
+  [--signing-identity NAME]       # optional; default: search keychain
+  [--version TAG]                 # default: latest release
+  [--ipa PATH]                    # skip download; use local unsigned IPA
+  [--json]                        # follows global output rules (default JSON)
+```
+
+Follow-on (not v1): `devicekit start`, `devicekit status`, `devicekit uninstall`.
+
+### Install flows
+
+| Target | Artifact | Signing | Install tool |
+| --- | --- | --- | --- |
+| **Simulator** | `devicekit-ios-Sim-*.zip` from releases | None | `simctl install` / XCTest launch |
+| **Real device** | `devicekit-ios-runner.ipa` (unsigned) | **Re-sign** with user's `.mobileprovision` | `xcrun devicectl` or `go-ios` |
+
+### Re-sign requirements (real device)
+
+Agent bundle id (upstream, fixed):
+
+`com.mobilenext.devicekit-iosUITests.xctrunner`
+
+| Profile type | Notes |
+| --- | --- |
+| **Wildcard** (`App ID *`) | Simplest — recommended in README |
+| **Explicit** | Requires Apple Developer App ID for bundle above; **not** on free Personal Team |
+
+Re-sign steps (implementation detail for dev):
+
+1. Download or accept `--ipa` (unsigned)
+2. Unzip → inject `embedded.mobileprovision`
+3. `codesign` app + embedded frameworks with matching identity
+4. Repackage → install to device
+
+### After install
+
+1. Launch XCTest runner on sim/device (v1: document `xcodebuild test` or thin launcher in WP1c+)
+2. Real device: port-forward `12004` (document `ios forward` / tunnel — host must reach `127.0.0.1:12004` on device)
+3. `xq-ios-act health --base-url http://127.0.0.1:12004`
+
+### Implementation layout
+
+```text
+modules/xq-ios-act-cli/
+  scripts/devicekit/
+    fetch-release.sh          # curl GitHub release asset
+    resign-ipa.sh             # unzip, provision, codesign, zip
+    install-sim.sh
+    install-device.sh
+  python/src/xq_ios_act/devicekit/
+    install.py                # orchestrates scripts; JSON envelope
+```
+
+Swift client may shell out to same scripts (macOS-only) to avoid duplicating sign logic.
+
+### Errors (agent-native)
+
+On failure, return JSON with `hint`, e.g.:
+
+- missing `--provisioning-profile` on device install
+- `ApplicationVerificationFailed` → check wildcard vs explicit profile
+- device not trusted / Developer Mode off
 
 ---
 
@@ -431,7 +494,7 @@ No `xq-ios-act devicekit install` in v1.
 | Swift Homebrew tap | follow-on |
 | `io swipe`, `orientation`, `device.url` wrappers | v1.1 or via `rpc` |
 | MJPEG/H264 stream helpers | separate commands or docs-only |
-| DeviceKit sim launcher script | if document-only proves insufficient |
+| DeviceKit sim launcher script | merged into `devicekit install --sim` |
 
 ---
 
@@ -448,7 +511,8 @@ No `xq-ios-act devicekit install` in v1.
 | D7 | `python/` + `swift/` subdirs under one module |
 | D8 | Python dist: **`uv tool install`**; Swift dist: **`swift build`** |
 | D9 | Android = Python transport only (follow-on) |
-| D10 | DeviceKit lifecycle document-only in v1 |
+| D10 | **First-party `devicekit install`** — fetch release, re-sign (device), install; no MobileCLI |
+| D11 | DeviceKit **artifacts** from upstream releases; no vendored source |
 
 ---
 

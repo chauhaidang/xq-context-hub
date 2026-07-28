@@ -12,7 +12,7 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: **dual clients** (Python prim
 ## Non-goals
 
 - Vendoring [devicekit-ios](https://github.com/mobile-next/devicekit-ios) into this repo
-- MobileCLI as the runtime API (optional ops helper only, documented later)
+- MobileCLI as the runtime API or install path (we own **devicekit install**)
 - MJPEG/H264 streaming helpers in v1 (RPC-thin first)
 - Changes to `xq-harness` or hub org glossaries
 - Android backend in v1 (Python transport follow-on)
@@ -58,7 +58,7 @@ _(Draft — finalize after open questions below.)_
 - [ ] Agent-native CLI contract: **JSON by default**, `--pretty`, same verbs/exit codes in **both** clients
 - [ ] Python: `[project.scripts]` + `uv tool install xq-ios-act`
 - [ ] Swift: `xq-ios-act` executable via SPM; `swift test` on macOS
-- [ ] Vibium-shaped command tree in both clients
+- [ ] **DeviceKit install** — `xq-ios-act devicekit install` (sim + signed real device); not MobileCLI
 - [ ] Default verification passes **without** live DeviceKit
 - [ ] CI: Linux (Python) + macOS (Swift tests)
 - [ ] Root `README.md`, `modules/README.md`, `CONSUMER_CONTEXT.md` updated when module ships
@@ -76,10 +76,11 @@ _(Draft — finalize after open questions below.)_
 3. **Swift (optional)** — `swift/Sources/`; `swift build`
 4. **Packaging** — uv + pyproject (Python); SPM (Swift)
 5. **Distribution** — Python: `uv tool install`; Swift: `swift build -c release`
-6. **Runtime** — DeviceKit @ `http://127.0.0.1:12004` (not vendored)
-7. **Transport** — WebSocket RPC; HTTP `/health` only
-8. **Verification** — `scripts/run-python.sh`, `scripts/run-swift.sh`, `scripts/run-all.sh`
-9. **CI** — Linux + macOS jobs, path-scoped workflow
+6. **DeviceKit install** — `devicekit install` (fetch release → re-sign → install); no MobileCLI
+7. **Runtime** — DeviceKit @ `http://127.0.0.1:12004` after install + launch
+8. **Transport** — WebSocket RPC; HTTP `/health` only
+9. **Verification** — `scripts/run-python.sh`, `scripts/run-swift.sh`, `scripts/run-all.sh`
+10. **CI** — Linux + macOS jobs, path-scoped workflow
 
 ### File ownership _(for parallel wave)_
 
@@ -154,7 +155,14 @@ Quick spikes to validate **both stacks** against the locked contract. Code lives
 | test | `swift test` + contract parity checks | `swift/Tests/**` |
 | devops | macOS CI job | workflow |
 
-### WP2 — agent skill (likely follow-on)
+### WP1c — DeviceKit install (with WP1, macOS)
+
+| Role | Package | Ownership |
+| --- | --- | --- |
+| dev | `devicekit install` command + install scripts | `python/src/.../devicekit/` or `scripts/devicekit/` |
+| test | mock/signing smoke tests; opt-in device test | `tests/` |
+| docs | provisioning profile requirements, tunnel/forward | module README |
+
 
 - **Role**: dev
 - **Done when**: `skills/xq-ios-act/SKILL.md` if in scope for v1
@@ -170,8 +178,8 @@ Quick spikes to validate **both stacks** against the locked contract. Code lives
 | --- | --- | --- | --- |
 | 1 | **v1 interaction model** | A) subcommands only B) REPL/session mode C) both | **A** for v1; session in v2 _(locked in DESIGN)_ |
 | 2 | **v1 command surface** | Minimal vs Vibium-shaped flat verbs | **Vibium-shaped** — `map`, `@ref`, `tap`, `diff map`, `rpc` escape hatch _(locked in DESIGN)_ |
-| 3 | **DeviceKit lifecycle** | A) document-only B) thin sim launcher helper | **A** for v1 _(locked in DESIGN)_ |
-| 4 | **Real-device setup** | A) document port-forward/tunnel B) optional MobileCLI `agent install` docs C) own scripts | **A + B** documented; no hard dep on MobileCLI |
+| 3 | **DeviceKit lifecycle** | A) document-only B) own install | **Own install** — `devicekit install` _(locked)_ |
+| 4 | **Real-device setup** | MobileCLI vs own sign+install | **Own process** — provisioning profile + tunnel docs _(locked)_ |
 | 5 | **Agent skill in v1?** | Ship with module vs follow-on | **Follow-on** (match scout-kit maturity path) |
 | 6 | **Live CI gate** | Default CI unit-only vs optional `workflow_dispatch` live DeviceKit | **Unit-only default**; live gate optional WP3 on macOS |
 | 7 | **Screenshot in v1** | Convenience `screenshot` vs `rpc` only | **Convenience wrapper** — default JSON base64 in `result` + optional `-o PATH`; `--pretty` shows summary |
@@ -185,7 +193,7 @@ Quick spikes to validate **both stacks** against the locked contract. Code lives
 - **Shared:** CLI contract only — no shared source; same `~/.xq-ios-act/` state
 - **Distribution:** Python `uv tool install`; Swift `swift build -c release`
 - **Agent UX (locked):** Vibium-shaped flat verbs — see [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
-- **Android path:** Python `xq_ios_act` transport only (follow-on)
+- **DeviceKit install (locked):** first-party `xq-ios-act devicekit install` — fetch upstream IPA/sim zip, re-sign for device, install; no MobileCLI
 - **Premature work:** versastack PR #8 Swift scaffold → rebase into `swift/` subdirectory
 
 ## Sequencing
