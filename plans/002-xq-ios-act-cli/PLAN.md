@@ -3,7 +3,7 @@
 - **ID**: `002-xq-ios-act-cli`
 - **Hub issue**: _(not opened — plan not approved yet)_
 - **Domains**: harness (`domains/harness/CONTEXT.md`) — `xq-versastack` only
-- **Status**: drafting — **WP0.5 prototypes next**
+- **Status**: **ready** — design locked; WP0.5 prototype sign-off → WP1 implementation
 
 ## Goal
 
@@ -12,7 +12,8 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: **dual clients** (Python prim
 ## Non-goals
 
 - Vendoring [devicekit-ios](https://github.com/mobile-next/devicekit-ios) into this repo
-- MobileCLI as the runtime API or install path (we own **devicekit install**)
+- MobileCLI as a runtime dependency (we own **devicekit lifecycle**; borrow patterns only)
+- Cloud device farms in v1 (Perfecto, BrowserStack, Mobile Next Fleet → v2)
 - MJPEG/H264 streaming helpers in v1 (RPC-thin first)
 - Changes to `xq-harness` or hub org glossaries
 - Android backend in v1 (Python transport follow-on)
@@ -49,13 +50,11 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: **dual clients** (Python prim
 | --- | --- | --- | --- | --- |
 | 1 | `xq-versastack` | `xq/xq-ios-act-cli-f8f1` | design → dev+test+devops | Checkout: `checkouts/xq-versastack` |
 
-## Acceptance criteria
-
-_(Draft — finalize after open questions below.)_
+## Acceptance criteria (locked)
 
 - [ ] `modules/xq-ios-act-cli/` with `python/` (pyproject, uv.lock) and `swift/` (Package.swift), tests, README
 - [ ] README: both clients; prerequisites; `uv tool install` (Python) and `swift build` (Swift)
-- [ ] Agent-native CLI contract: **JSON by default**, `--pretty`, same verbs/exit codes in **both** clients
+- [ ] Vibium-shaped verbs: `map`, `tap @eN`, `diff map`, `rpc`; `MapStore` + `ensure_runtime()`
 - [ ] Python: `[project.scripts]` + `uv tool install xq-ios-act`
 - [ ] Swift: `xq-ios-act` executable via SPM; `swift test` on macOS
 - [ ] **DeviceKit lifecycle** — `devicekit install`, `devicekit start`, `devicekit status`; `ensure_runtime()` on RPC verbs; not MobileCLI
@@ -133,11 +132,11 @@ Quick spikes to validate **both stacks** against the locked contract. Code lives
 
 **Explicitly out of scope for prototypes:** full verb tree, MapStore, CI, `uv tool install`, live DeviceKit gate.
 
-### WP0 — contract / design (**now**)
+### WP0 — contract / design (**complete**)
 
 - **Role**: `engineer-in-design` + product-lead + user approval
-- **Design artifact**: [`DESIGN.md`](DESIGN.md) — CLI surface, tech stack, architecture, seams
-- **Done when**: open questions resolved; acceptance criteria locked; plan status → `ready`
+- **Design artifact**: [`DESIGN.md`](DESIGN.md) — hybrid Vibium UX + MobileCLI DeviceKit lifecycle
+- **Done when**: ~~open questions resolved~~ ✓ — plan status → `ready`
 
 ### WP1 — Python (after approval)
 
@@ -182,37 +181,40 @@ Hybrid: MobileCLI install/start patterns + Vibium `ensure_runtime`.
 - **Role**: test + devops
 - **Done when**: `workflow_dispatch` job against booted sim + DeviceKit on macOS
 
-## Open questions — **need your decisions**
+## Decisions (locked)
 
-| # | Question | Options | Recommendation |
-| --- | --- | --- | --- |
-| 1 | **v1 interaction model** | A) subcommands only B) REPL/session mode C) both | **A** for v1; session in v2 _(locked in DESIGN)_ |
-| 2 | **v1 command surface** | Minimal vs Vibium-shaped flat verbs | **Vibium-shaped** — `map`, `@ref`, `tap`, `diff map`, `rpc` escape hatch _(locked in DESIGN)_ |
-| 3 | **DeviceKit lifecycle** | A) document-only B) own install | **Own install** — `devicekit install` _(locked)_ |
-| 4 | **Real-device setup** | MobileCLI vs own sign+install | **Own process** — provisioning profile + tunnel docs _(locked)_ |
-| 5 | **Agent skill in v1?** | Ship with module vs follow-on | **Follow-on** (match scout-kit maturity path) |
-| 6 | **Live CI gate** | Default CI unit-only vs optional `workflow_dispatch` live DeviceKit | **Unit-only default**; live gate optional WP3 on macOS |
-| 7 | **Screenshot in v1** | Convenience `screenshot` vs `rpc` only | **Convenience wrapper** — default JSON base64 in `result` + optional `-o PATH`; `--pretty` shows summary |
-| 8 | **Clients** | Python only vs Python + Swift | **Both** — Python primary, Swift optional _(locked)_ |
-| 9 | **Python distribution** | `uv tool` vs binary bundle | **`uv tool install`** _(locked)_ |
-| 10 | **Swift in v1?** | WP1 vs WP1b | **WP1b** — same contract; parallel if capacity |
+| # | Topic | Decision |
+| --- | --- | --- |
+| 1 | Interaction model | Subcommands only v1; session v2 |
+| 2 | Command surface | Vibium flat verbs + `map`/`@ref`/`diff map` |
+| 3 | Architecture | Vibium agent UX + MobileCLI DeviceKit lifecycle; WS `/ws` RPC |
+| 4 | DeviceKit lifecycle | `devicekit install` + `start` + `status`; `ensure_runtime()` |
+| 5 | Real device | Own re-sign + tunnel/forward docs; wildcard profile recommended |
+| 6 | Clients | Python primary + Swift optional (WP1b) |
+| 7 | Distribution | `uv tool install` / `swift build` |
+| 8 | Output | JSON default; `--pretty`; exit codes 0/2/3/4/5 |
+| 9 | Screenshot | v1 wrapper; base64 + `-o PATH` |
+| 10 | Skill | WP2 follow-on |
+| 11 | CI | Linux unit default; optional macOS live gate WP3 |
+| 12 | Cloud (Perfecto, etc.) | **v2** — fleet proxy or Appium adapter |
 
 ## Notes / decisions
 
+- **Hybrid (locked):** Vibium-shaped CLI on DeviceKit WS; MobileCLI patterns for install/start without MobileCLI binary
 - **Clients (locked):** Python 3.14 (primary, Fire, uv tool) + Swift 5.9+ (optional, ArgumentParser, swift build)
 - **Shared:** CLI contract only — no shared source; same `~/.xq-ios-act/` state
 - **Distribution:** Python `uv tool install`; Swift `swift build -c release`
-- **Agent UX (locked):** Vibium-shaped flat verbs — see [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
-- **DeviceKit install (locked):** `devicekit install` — fetch release, re-sign (device), install; no MobileCLI
+- **Agent UX:** see [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md) + [`DESIGN.md`](DESIGN.md) § Design wrap-up
 - **Android path:** Python `xq_ios_act` transport only (follow-on)
 - **Premature work:** versastack PR #8 Swift scaffold → rebase into `swift/` subdirectory
 
 ## Sequencing
 
 ```text
-NOW:     WP0.5 — throwaway prototypes (python + swift) under prototypes/
-NEXT:    learnings → user sign-off → plan status ready
-THEN:    discard prototypes/ → WP1 (python/) + WP1b (swift/) clean implementation
+DONE:    WP0 — design locked (Vibium UX + MobileCLI lifecycle + WS DeviceKit)
+NOW:     WP0.5 — prototype sign-off → discard prototypes/
+NEXT:    WP1 (python/) + WP1b (swift/) + WP1c (devicekit lifecycle)
+THEN:    WP2 skill; optional WP3 live CI gate
 SNAP:    product-lead/root — run snap commands
 REVIEW:  engineer-in-review → one PR (user-approved remote_writes)
 ```

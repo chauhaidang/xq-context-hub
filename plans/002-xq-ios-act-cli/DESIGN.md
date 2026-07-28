@@ -3,7 +3,7 @@
 - **Plan**: [`PLAN.md`](PLAN.md)
 - **Benchmark**: [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
 - **Role**: `engineer-in-design`
-- **Status**: draft for product-lead / user review
+- **Status**: **ready** — design locked; proceed to WP1 after prototype sign-off
 - **Repo**: `xq-versastack` → `modules/xq-ios-act-cli/`
 
 ## Summary
@@ -27,7 +27,90 @@ Both clients implement the **same CLI contract** (verbs, flags, JSON envelope, e
 
 **Agent UX (locked):** Vibium-shaped flat verbs — `map` → `@ref` → `tap` → `diff map` (see [VIBIUM-BENCHMARK.md](VIBIUM-BENCHMARK.md)).
 
+**Runtime (locked):** Local sim + USB device only in v1. Cloud farms (Perfecto, BrowserStack) and Mobile Next Fleet are **v2** — see § Out of scope / v2.
+
 **v1 interaction model:** subcommands only (no REPL). Each invocation is a short-lived process that opens a WS connection, performs one or more RPC round-trips defined by that subcommand, then exits. A persistent session/daemon is **v2**.
+
+---
+
+## Design wrap-up (locked)
+
+### What we're building
+
+`xq-ios-act` is an **agent-native iOS CLI** — Vibium's UX on MobileCLI's DeviceKit runtime, without either as a dependency.
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  Vibium layer: flat verbs, map/@ref/diff, JSON default,     │
+│                skill contract (WP2), ensure_runtime()       │
+├─────────────────────────────────────────────────────────────┤
+│  xq-ios-act:   kitCall() → WS JSON-RPC, MapStore on disk    │
+│                devicekit install | start | status           │
+├─────────────────────────────────────────────────────────────┤
+│  MobileCLI patterns (no binary): resign IPA, StartAgent,    │
+│                port-forward 12004, idempotent install       │
+├─────────────────────────────────────────────────────────────┤
+│  DeviceKit:    external XCUITest server @ :12004            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### v1 command surface (final)
+
+```text
+xq-ios-act [--pretty] [--base-url URL] [--timeout SEC]
+
+  health
+  map [--out PATH]
+  diff map
+  tap @eN | --x INT --y INT
+  type TEXT | --ref @eN TEXT
+  screenshot [-o PATH]
+  launch --bundle-id ID
+  foreground
+  dump
+  rpc --method NAME [--params JSON]
+
+  devicekit install [--sim | --device UDID] [--provisioning-profile PATH] ...
+  devicekit start   [--sim | --device UDID]
+  devicekit status  [--device UDID]
+```
+
+RPC verbs call `ensure_runtime()` by default (`--no-ensure-runtime` for debug).
+
+### Agent loop (document in skill WP2)
+
+```bash
+xq-ios-act devicekit install --sim          # once
+xq-ios-act launch --bundle-id com.example.app
+xq-ios-act map
+xq-ios-act tap @e3
+xq-ios-act diff map
+```
+
+### Locked product decisions
+
+| Topic | Decision |
+| --- | --- |
+| Clients | Python 3.14 primary + Swift 5.9+ optional; same contract |
+| Distribution | `uv tool install xq-ios-act` / `swift build -c release` |
+| Transport | WS `/ws` for RPC; HTTP `/health` only |
+| Output | JSON default; `--pretty` for humans; exit codes 0/2/3/4/5 |
+| Refs | Client-side `MapStore` at `~/.xq-ios-act/` |
+| Lifecycle | Own `devicekit install/start/status`; no MobileCLI |
+| Screenshot | Wrapper in v1; base64 in JSON + optional `-o PATH` |
+| Skill | WP2 follow-on (not blocking v1 ship) |
+| Swift timing | WP1b parallel with Python if capacity |
+| Cloud (Perfecto, etc.) | **Out of v1** — v2 fleet proxy or Appium adapter |
+
+### v2 roadmap (not v1)
+
+| Item | Pattern |
+| --- | --- |
+| Remote fleet | MobileCLI `RemoteDevice` — fleet WS + `deviceId`, skip local `StartAgent` |
+| Perfecto / BrowserStack | Appium transport adapter behind same verbs (separate backend) |
+| `session` / REPL | One WS connection, stdin JSON-RPC lines |
+| MCP | Same handlers as CLI |
+| Android | Python `AutomationTransport` → devicekit-android |
 
 ---
 
@@ -646,11 +729,13 @@ On failure, return JSON with `hint`, e.g.:
 | --- | --- |
 | `skills/xq-ios-act/SKILL.md` | WP2 — after CLI stabilizes |
 | `session` / REPL | v2 |
+| Remote fleet (Mobile Next–style) | v2 — `RemoteTransport` + auth/allocate; same DeviceKit RPC |
+| Perfecto / BrowserStack / Appium hub | v2 — `AppiumTransport` adapter; different engine |
 | Android transport (Python only) | v1.1+ |
 | Swift Homebrew tap | follow-on |
+| `find label`, `wait text` | v1.1 |
 | `io swipe`, `orientation`, `device.url` wrappers | v1.1 or via `rpc` |
 | MJPEG/H264 stream helpers | separate commands or docs-only |
-| DeviceKit sim launcher script | merged into `devicekit install --sim` |
 
 ---
 
@@ -672,14 +757,18 @@ On failure, return JSON with `hint`, e.g.:
 | D12 | **Hybrid:** Vibium agent UX + MobileCLI DeviceKit lifecycle patterns; **WS `/ws`** for RPC (not MobileCLI HTTP `/rpc`) |
 | D13 | `ensure_runtime()` + `devicekit start` — Vibium auto-start equivalent for simulator (and device when profile already used at install) |
 | D14 | `devicekit install` + `start` + `status` in v1 (WP1c); no MobileCLI binary dependency |
+| D15 | **v1 scope:** local sim + USB device only; cloud farms deferred to v2 |
+| D16 | **Screenshot v1:** convenience wrapper; base64 in `result` + `-o PATH` |
+| D17 | **Skill WP2** — not blocking v1 module ship |
 
 ---
 
-## Open items for product-lead / user
+## Resolved (was open)
 
-1. **Screenshot output** — default JSON includes base64 in `result`; optional `-o PATH` writes PNG file; `--pretty` prints path/summary?
-2. **Swift in v1 scope?** — ship with Python in WP1, or WP1b immediately after? _(recommend: WP1b parallel if capacity)_
-3. **Discard/rebase versastack PR #8** — move Swift scaffold into `swift/` per this layout
+1. **Screenshot** — base64 in JSON `result` + optional `-o PATH`; `--pretty` prints path/summary.
+2. **Swift in v1** — WP1b; parallel with Python when capacity allows.
+3. **Versastack PR #8** — close or rebase premature scaffold into `swift/` per module layout.
+4. **Cloud devices** — out of v1; MobileCLI fleet pattern or Appium adapter in v2.
 
 ---
 
