@@ -1,6 +1,7 @@
 # Design: xq-ios-act-cli
 
 - **Plan**: [`PLAN.md`](PLAN.md)
+- **Dev spec**: [`DEV-SPEC.md`](DEV-SPEC.md)
 - **Benchmark**: [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
 - **Role**: `engineer-in-design`
 - **Status**: **ready** — design locked; proceed to WP1 after prototype sign-off
@@ -778,8 +779,8 @@ When plan is `ready`:
 
 | Role | Package | Starts from |
 | --- | --- | --- |
-| `engineer-in-dev` | WP1 — library + CLI per command tree | This doc § Package layout, seams |
-| `engineer-in-test` | WP1 — mock transport tests + `scripts/` + TSR | § Testing architecture |
-| `engineer-in-devops` | WP1 — Linux CI workflow (+ optional macOS live gate) | § CI notes |
+| `engineer-in-dev` | WP1 — library + CLI per command tree | [`DEV-SPEC.md`](DEV-SPEC.md) §2–§11 |
+| `engineer-in-test` | WP1 — mock transport tests + `scripts/` + TSR | [`DEV-SPEC.md`](DEV-SPEC.md) §12 |
+| `engineer-in-devops` | WP1 — Linux CI workflow (+ optional macOS live gate) | [`DEV-SPEC.md`](DEV-SPEC.md) §13 |
 
 **Contract pointer:** `plans/002-xq-ios-act-cli/PLAN.md#work-contract--xq-versastack`

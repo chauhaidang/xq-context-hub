@@ -136,6 +136,7 @@ Quick spikes to validate **both stacks** against the locked contract. Code lives
 
 - **Role**: `engineer-in-design` + product-lead + user approval
 - **Design artifact**: [`DESIGN.md`](DESIGN.md) — hybrid Vibium UX + MobileCLI DeviceKit lifecycle
+- **Dev spec**: [`DEV-SPEC.md`](DEV-SPEC.md) — implementation phases, file tree, APIs, tests
 - **Done when**: ~~open questions resolved~~ ✓ — plan status → `ready`
 
 ### WP1 — Python (after approval)
@@ -222,6 +223,7 @@ REVIEW:  engineer-in-review → one PR (user-approved remote_writes)
 ## Links
 
 - **Design**: [`DESIGN.md`](DESIGN.md)
+- **Dev spec**: [`DEV-SPEC.md`](DEV-SPEC.md)
 - **Benchmark**: [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
 - Research: `checkouts/xq-versastack/docs/research/xq-ios-act-cli.md`
 - DeviceKit iOS: https://github.com/mobile-next/devicekit-ios
