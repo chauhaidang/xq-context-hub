@@ -144,7 +144,129 @@ Output: `prototypes/LEARNINGS.md` → user sign-off → delete `prototypes/` →
 
 ---
 
-## Architecture
+## Hybrid architecture: Vibium agent UX + MobileCLI DeviceKit runtime
+
+**Goal:** One CLI that feels like **Vibium** to agents (flat verbs, map/@ref/diff, skill-first, JSON-by-default) and talks to iOS like **MobileCLI** talks to DeviceKit (install → launch runner → port-forward → **WebSocket JSON-RPC** on `:12004`) — **without** depending on the MobileCLI binary or its Mac-side `:12000` server.
+
+### What we take from each
+
+| From Vibium | From MobileCLI | We do **not** take |
+| --- | --- | --- |
+| Flat verbs (`map`, `tap`, `diff map`) | Fetch + checksum pinned `devicekit-ios` release artifacts | `mobilecli server start` (`:12000` proxy) |
+| `map` → `@eN` → act → verify loop | `ResignIPA` + `agent install` flow for real devices | MobileCLI as runtime dependency |
+| Thin CLI → single dispatch (`kitCall`) | `StartAgent`: launch XCTest runner, port-forward `12004`, wait `/health` | MobileCLI HTTP-only `WdaClient` (`POST /rpc`) — we use **WS `/ws`** |
+| Skill as primary agent contract | Simulator: `LaunchAppWithEnv(DEVICEKIT_LISTEN_PORT)` | MobileCLI JSON-RPC error surface on Mac |
+| JSON machine output + actionable errors | Real device: `testmanagerd` + iOS 17+ tunnel | Vibium's own daemon + Chrome |
+| Client-side session (`MapStore` on disk) | Bundle id suffix match after re-sign | Deep `device/io/apps` nesting |
+| `ensure_runtime()` retry (Vibium `autoStartDaemon`) | Idempotent `agent install` (skip if version matches) | Building a second long-lived daemon (DeviceKit **is** the server) |
+
+### Unified stack (three layers)
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  LAYER A — Agent surfaces (Vibium-shaped)                        │
+│  bash:  xq-ios-act map && xq-ios-act tap @e3 && xq-ios-act diff map │
+│  skill: skills/xq-ios-act/SKILL.md (primary contract)            │
+│  future: MCP / pipe (v2) — same handlers as CLI                  │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ parse flags → resolve @ref (MapStore)
+                             │ kitCall(method, params) → envelope
+┌────────────────────────────▼────────────────────────────────────┐
+│  LAYER B — xq-ios-act CLI (thin, ephemeral — like vibium CLI)    │
+│  • one module per verb (map.py, tap.py, …)                       │
+│  • ensure_runtime() before RPC (Vibium auto-start, MC StartAgent) │
+│  • MapStore: ~/.xq-ios-act/last-map.json + ref table             │
+│  • devicekit install | start | status (MobileCLI agent lifecycle) │
+└────────────────────────────┬────────────────────────────────────┘
+                             │ GET /health  (readiness)
+                             │ WS  /ws      (all JSON-RPC — not POST /rpc)
+┌────────────────────────────▼────────────────────────────────────┐
+│  LAYER C — DeviceKit on sim/device (long-lived — like vibium     │
+│            daemon + browser, but external)                        │
+│  127.0.0.1:12004 — device.dump.ui, device.io.tap, …            │
+│  XCTest runner: com.mobilenext.devicekit-iosUITests.xctrunner    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Key split:** Vibium owns **agent UX + ref/session semantics** in the CLI. MobileCLI patterns own **iOS bootstrap** (install, launch, forward). DeviceKit owns **automation RPC**. We do not insert a Mac-side proxy daemon.
+
+### `ensure_runtime()` — Vibium auto-start meets MobileCLI `StartAgent`
+
+Every RPC verb (`map`, `tap`, `screenshot`, …) calls `ensure_runtime()` before `kitCall()`:
+
+```text
+ensure_runtime(base_url, device?)
+  1. GET /health → ok? return
+  2. devicekit status → installed?
+       no  → fail with hint: xq-ios-act devicekit install --sim …
+  3. devicekit start --device …     # MobileCLI StartAgent equivalent
+       sim:     LaunchAppWithEnv(DEVICEKIT_LISTEN_PORT) or fixed 12004
+       device:  tunnel (iOS 17+) → forward host:12004 → device:12004
+                → LaunchTestRunner(devicekit-iosUITests.xctest)
+                → poll GET /health (20s)
+  4. GET /health again → ok? return
+  5. fail with JSON hint (Developer Mode, profile, tunnel, …)
+```
+
+Agents get Vibium-like “first `map` just works” on **simulator** when `devicekit install` was run once. Real device still requires provisioning profile at install time — `ensure_runtime` cannot magic that away, but collapses launch + forward into one command.
+
+### Transport: WebSocket (our choice) vs MobileCLI HTTP
+
+MobileCLI's on-device client uses **HTTP** `GET /health` + `POST /rpc`. DeviceKit also exposes **`WS /ws`** for JSON-RPC 2.0. **xq-ios-act uses WebSocket for all RPC** — same protocol DeviceKit documents, better fit for future `session` mode, and no dependency on MobileCLI's HTTP client layer.
+
+| Endpoint | MobileCLI | xq-ios-act |
+| --- | --- | --- |
+| `GET /health` | readiness (`WaitForAgent`) | `health`, `ensure_runtime` poll |
+| `POST /rpc` | all automation calls | **not used** |
+| `WS /ws` | not used by MobileCLI device layer | **all RPC** (`kitCall`) |
+
+### Command dispatch (Vibium pattern, DeviceKit methods)
+
+```python
+# Every verb ~15 lines (Vibium daemonCall shape)
+async def tap(self, ref: str | None = None, x: int | None = None, y: int | None = None):
+    await ensure_runtime(self.config)
+    params = self.map_store.resolve_tap(ref, x, y)   # @e3 → {x, y}
+    result = await kit_call("device.io.tap", params)
+    self.map_store.invalidate()                       # ref lifecycle (skill)
+    return print_envelope("tap", result, method="device.io.tap")
+```
+
+DeviceKit method names stay upstream (`device.io.tap`, `device.dump.ui`); CLI verbs stay agent-native (`tap`, `map`).
+
+### Lifecycle: zero → agent loop
+
+```text
+1. INSTALL CLI (Vibium: npm i -g vibium)
+   uv tool install xq-ios-act
+
+2. INSTALL RUNTIME (Vibium: vibium install → Chrome)
+   xq-ios-act devicekit install --sim
+   # device: + --provisioning-profile PATH
+
+3. FIRST AUTOMATION COMMAND (Vibium: auto-starts daemon)
+   xq-ios-act map
+   └─ ensure_runtime() → devicekit start if needed → WS kitCall
+
+4. CORE LOOP (Vibium: map → click @e1 → diff map)
+   xq-ios-act launch --bundle-id com.example.app
+   xq-ios-act map
+   xq-ios-act tap @e3
+   xq-ios-act diff map
+
+5. ESCAPE HATCH (Vibium: eval)
+   xq-ios-act rpc --method device.io.swipe --params '{...}'
+```
+
+### `devicekit` subcommands (MobileCLI `agent` + `StartAgent`, our contract)
+
+| Command | MobileCLI equivalent | v1 |
+| --- | --- | --- |
+| `devicekit install` | `mobilecli agent install` | **yes** (WP1c) |
+| `devicekit start` | implicit `StartAgent` | **yes** (WP1c) — required for `ensure_runtime` |
+| `devicekit status` | `mobilecli agent status` | **yes** (WP1c) |
+| `devicekit stop` | _(no direct equivalent)_ | v1.1 |
+| `devicekit uninstall` | `mobilecli agent uninstall` | v1.1 |
 
 ### Module layout (dual client — target after prototypes)
 
@@ -265,9 +387,11 @@ xq-ios-act [--pretty] [--base-url URL] [--timeout SEC]
   dump
   rpc --method NAME [--params JSON]
   devicekit install [--sim | --device UDID] [--provisioning-profile PATH] ...
+  devicekit start [--sim | --device UDID]     # launch runner + forward; ensure_runtime
+  devicekit status [--device UDID]            # installed? server reachable?
 ```
 
-**v1 scope lock (recommended):** commands above + `rpc`. Swipe/gesture/orientation via `rpc` until v1.1.
+**v1 scope lock (recommended):** commands above + `rpc`. Swipe/gesture/orientation via `rpc` until v1.1. RPC verbs call `ensure_runtime()` by default; `--no-ensure-runtime` skips auto-start (debug only).
 
 **Local session (Vibium-inspired):** cache last map + ref table under `~/.xq-ios-act/` (or `$XQ_IOS_ACT_STATE_DIR`); invalidate refs after UI-changing acts — document in skill.
 
@@ -400,7 +524,33 @@ xq-ios-act devicekit install [--sim | --device UDID]
   [--json]                        # follows global output rules (default JSON)
 ```
 
-Follow-on (not v1): `devicekit start`, `devicekit status`, `devicekit uninstall`.
+### `devicekit start` (MobileCLI `StartAgent` — v1)
+
+Launches the XCTest runner and makes `base-url` reachable. Called explicitly or via `ensure_runtime()`.
+
+| Target | Steps (from MobileCLI patterns) |
+| --- | --- |
+| **Simulator** | Boot check → find runner bundle id → `LaunchAppWithEnv` with `DEVICEKIT_LISTEN_PORT` (default `12004`) → poll `GET /health` |
+| **Real device** | Tunnel (iOS 17+, go-ios or documented `ios tunnel`) → port-forward host→device `12004` → `LaunchTestRunner` with `devicekit-iosUITests.xctest` → poll `/health` → optional HOME to background runner |
+
+Persist forward metadata under `~/.xq-ios-act/device.json` (`deviceId`, `forwardPort`, `bundleId`) so subsequent commands reuse the forwarder.
+
+### `devicekit status` (v1)
+
+JSON envelope:
+
+```json
+{
+  "ok": true,
+  "result": {
+    "installed": true,
+    "bundleId": "TEAM.com.mobilenext.devicekit-iosUITests.xctrunner",
+    "version": "0.0.20",
+    "serverReachable": true,
+    "baseUrl": "http://127.0.0.1:12004"
+  }
+}
+```
 
 ### Install flows
 
@@ -429,21 +579,27 @@ Re-sign steps (implementation detail for dev):
 
 ### After install
 
-1. Launch XCTest runner on sim/device (v1: document `xcodebuild test` or thin launcher in WP1c+)
-2. Real device: port-forward `12004` (document `ios forward` / tunnel — host must reach `127.0.0.1:12004` on device)
-3. `xq-ios-act health --base-url http://127.0.0.1:12004`
+1. `xq-ios-act devicekit start` (or rely on `ensure_runtime()` on first `map`/`tap`)
+2. `xq-ios-act health` — must return `ok` before agent loop
+3. `xq-ios-act map` — begin Vibium-shaped loop
 
 ### Implementation layout
 
 ```text
 modules/xq-ios-act-cli/
   scripts/devicekit/
-    fetch-release.sh          # curl GitHub release asset
-    resign-ipa.sh             # unzip, provision, codesign, zip
-    install-sim.sh
-    install-device.sh
-  python/src/xq_ios_act/devicekit/
-    install.py                # orchestrates scripts; JSON envelope
+    fetch-release.sh          # curl GitHub release asset + checksum
+    resign-ipa.sh             # unzip, provision, codesign, zip (MobileCLI ResignIPA)
+    install-sim.sh              # simctl install
+    install-device.sh           # devicectl or go-ios zipconduit
+    start-sim.sh                # LaunchAppWithEnv + health poll
+    start-device.sh             # tunnel + forward + LaunchTestRunner + health poll
+  python/src/xq_ios_act/
+    runtime.py                  # ensure_runtime()
+    devicekit/
+      install.py
+      start.py
+      status.py
 ```
 
 Swift client may shell out to same scripts (macOS-only) to avoid duplicating sign logic.
@@ -513,6 +669,9 @@ On failure, return JSON with `hint`, e.g.:
 | D9 | Android = Python transport only (follow-on) |
 | D10 | **First-party `devicekit install`** — fetch release, re-sign (device), install; no MobileCLI |
 | D11 | DeviceKit **artifacts** from upstream releases; no vendored source |
+| D12 | **Hybrid:** Vibium agent UX + MobileCLI DeviceKit lifecycle patterns; **WS `/ws`** for RPC (not MobileCLI HTTP `/rpc`) |
+| D13 | `ensure_runtime()` + `devicekit start` — Vibium auto-start equivalent for simulator (and device when profile already used at install) |
+| D14 | `devicekit install` + `start` + `status` in v1 (WP1c); no MobileCLI binary dependency |
 
 ---
 

@@ -197,3 +197,28 @@ Go is attractive for Vibium because they **own** the engine and ship one binary 
 ## Open question for product-lead / user
 
 Adopt Vibium's **flat verb + map/@ref** model as the primary agent UX (recommended), or keep nested `device/io/apps` + coordinates-only?
+
+---
+
+## Synthesis: Vibium + MobileCLI → xq-ios-act
+
+**Locked direction** (see [`DESIGN.md`](DESIGN.md) § Hybrid architecture):
+
+| Concern | Owner | Mechanism |
+| --- | --- | --- |
+| Agent verbs & ref loop | **Vibium** | `map`, `tap @eN`, `diff map`, `MapStore`, skill-first |
+| Thin command files | **Vibium** | `kitCall()` ≈ `daemonCall()`; ~15 lines per verb |
+| Auto-start runtime | **Vibium pattern** | `ensure_runtime()` before RPC |
+| Install signed runner | **MobileCLI pattern** | `devicekit install` ≈ `agent install` + `ResignIPA` |
+| Launch runner + forward | **MobileCLI pattern** | `devicekit start` ≈ `StartAgent` |
+| Talk to DeviceKit | **DeviceKit native** | **WS `/ws`** JSON-RPC (MobileCLI uses HTTP `/rpc` — we skip that) |
+| Mac proxy server | **Neither** | No `:12000` MobileCLI server; direct to `:12004` |
+
+**Agent session (bash):**
+
+```bash
+xq-ios-act devicekit install --sim          # once (MobileCLI agent install)
+xq-ios-act launch --bundle-id com.example.app
+xq-ios-act map && xq-ios-act tap @e3 && xq-ios-act diff map   # Vibium loop
+# ensure_runtime() calls devicekit start on first map if server down
+```
