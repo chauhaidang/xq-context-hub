@@ -163,6 +163,7 @@ Quick spikes to validate **both stacks** against the locked contract. Code lives
 | test | mock/signing smoke tests; opt-in device test | `tests/` |
 | docs | provisioning profile requirements, tunnel/forward | module README |
 
+### WP2 — agent skill (likely follow-on)
 
 - **Role**: dev
 - **Done when**: `skills/xq-ios-act/SKILL.md` if in scope for v1
@@ -193,7 +194,7 @@ Quick spikes to validate **both stacks** against the locked contract. Code lives
 - **Shared:** CLI contract only — no shared source; same `~/.xq-ios-act/` state
 - **Distribution:** Python `uv tool install`; Swift `swift build -c release`
 - **Agent UX (locked):** Vibium-shaped flat verbs — see [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
-- **DeviceKit install (locked):** first-party `xq-ios-act devicekit install` — fetch upstream IPA/sim zip, re-sign for device, install; no MobileCLI
+- **Android path:** Python `xq_ios_act` transport only (follow-on)
 - **Premature work:** versastack PR #8 Swift scaffold → rebase into `swift/` subdirectory
 
 ## Sequencing
