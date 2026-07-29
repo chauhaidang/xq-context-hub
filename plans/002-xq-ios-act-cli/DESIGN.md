@@ -63,10 +63,10 @@ xq-ios-act [--pretty] [--base-url URL] [--timeout SEC]
   health
   map [--out PATH]
   diff map
-  tap @eN | --x INT --y INT
-  type TEXT | --ref @eN TEXT
-  screenshot [-o PATH]
-  launch --bundle-id ID
+  tap @eN | tap X Y
+  type [@eN] TEXT
+  screenshot PATH
+  launch BUNDLE_ID
   foreground
   dump
   rpc --method NAME [--params JSON]
@@ -98,7 +98,7 @@ xq-ios-act diff map
 | Output | JSON default; **action tier = `{"ok":true}`**; data tier for map/diff; `--pretty`; exit 0/2/3/4/5 |
 | Refs | Client-side `MapStore` at `~/.xq-ios-act/` |
 | Lifecycle | Own `devicekit install/start/status`; no MobileCLI |
-| Screenshot | **`-o PATH` required**; stdout action-tier `{"ok":true}` |
+| Screenshot | **positional PATH**; action-tier `{"ok":true}` |
 | Skill | WP2 follow-on (not blocking v1 ship) |
 | Swift timing | WP1b parallel with Python if capacity |
 | Cloud (Perfecto, etc.) | **Out of v1** — v2 fleet proxy or Appium adapter |
@@ -463,10 +463,10 @@ xq-ios-act [--pretty] [--base-url URL] [--timeout SEC]
   health
   map [--out PATH]                # device.dump.ui + client @ref assignment
   diff map                        # compare to cached last map
-  tap @eN | --x INT --y INT
-  type TEXT | --ref @eN TEXT
-  screenshot [-o PATH]
-  launch --bundle-id ID
+  tap @eN | tap X Y
+  type [@eN] TEXT
+  screenshot PATH
+  launch BUNDLE_ID
   foreground
   dump
   rpc --method NAME [--params JSON]
@@ -496,11 +496,27 @@ Agents chain many **actions** in tight loops (`tap`, `type`, `launch`). Parsing 
 
 | Tier | Commands | Success stdout (JSON default) | DeviceKit wire |
 | --- | --- | --- | --- |
-| **Action** (minimal) | `tap`, `type`, `launch`, `foreground`, `screenshot` (with `-o`) | `{"ok":true}` only — no `command`, `result`, or `meta` | Send RPC; confirm no JSON-RPC `error`; **discard `result` body** (do not re-serialize upstream payload) |
+| **Action** (minimal) | `tap`, `type`, `launch`, `foreground`, `screenshot PATH` | `{"ok":true}` only — no `command`, `result`, or `meta` | Send RPC; confirm no JSON-RPC `error`; **discard `result` body** (do not re-serialize upstream payload) |
 | **Data** (rich) | `map`, `diff map`, `dump`, `rpc`, `health`, `devicekit status` | Full envelope with `result` (see below) | Parse and forward `result` as needed |
 | **Lifecycle** (minimal) | `devicekit install`, `devicekit start` | `{"ok":true}` on success | N/A (host scripts) |
 
-**`screenshot`:** require **`-o PATH`** in v1 for the action fast path (write file, stdout `{"ok":true}`). Omitting `-o` is a **usage error** (exit 2) with hint — avoids base64 blobs on the hot path.
+**`screenshot`:** path is a **positional** argument (`screenshot /tmp/s.png`). Write file; stdout `{"ok":true}`. No `-o` flag on the hot path.
+
+### CLI invocation — positional-first (locked)
+
+Agents should not need `--` flags on the action hot path. **Vibium-shaped:** refs and args are positionals.
+
+| Verb | Short form (preferred) | Long form (optional) |
+| --- | --- | --- |
+| `tap` | `tap @e3` · `tap 120 44` | `tap --x=120 --y=44` |
+| `type` | `type @e2 hello` · `type hello` | `type hello --ref=@e2` |
+| `screenshot` | `screenshot /tmp/s.png` | `screenshot --path=/tmp/s.png` |
+| `launch` | `launch com.example.app` | `launch --bundle-id=com.example.app` |
+| `rpc` | `rpc device.dump.ui` | `rpc --method=device.dump.ui` |
+
+**Globals:** prefer env (`XQ_IOS_ACT_BASE_URL`, `XQ_IOS_ACT_TIMEOUT`) so verbs stay two tokens: `xq-ios-act tap @e3`. Use `--pretty` only for humans.
+
+**Fire / ArgumentParser:** implement positionals first; flags are escape hatches for scripts that cannot pass `@e3` unquoted.
 
 **`rpc`:** always **Data** tier — escape hatch keeps raw DeviceKit `result`.
 
@@ -792,13 +808,14 @@ On failure, return JSON with `hint`, e.g.:
 | D15 | **v1 scope:** local sim + USB device only; cloud farms deferred to v2 |
 | D16 | **Two-tier responses** — Action `{"ok":true}`; Data for map/diff/dump/rpc/health |
 | D17 | **Skill WP2** — not blocking v1 module ship |
-| D18 | **Screenshot v1:** `-o PATH` required; no base64 on stdout |
+| D18 | **Screenshot v1:** positional path; no base64 on stdout |
+| D19 | **Positional-first CLI** — `tap @e3`, `type @e2 hi`, `screenshot /tmp/x.png`; flags optional |
 
 ---
 
 ## Resolved (was open)
 
-1. **Screenshot** — **locked:** `-o PATH` required; action-tier `ok` only.
+1. **Screenshot** — **locked:** positional path; action-tier `ok` only.
 2. **Swift in v1** — WP1b; parallel with Python when capacity allows.
 3. **Versastack PR #8** — close or rebase premature scaffold into `swift/` per module layout.
 4. **Cloud devices** — out of v1; MobileCLI fleet pattern or Appium adapter in v2.

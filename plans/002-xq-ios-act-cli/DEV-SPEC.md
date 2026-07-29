@@ -220,7 +220,7 @@ Default `state_dir`: `Path.home() / ".xq-ios-act"`.
 
 | Tier | Commands | Success JSON |
 | --- | --- | --- |
-| **action** | `tap`, `type`, `launch`, `foreground`, `screenshot` (with `-o`), `devicekit install`, `devicekit start` | `{"ok":true}` |
+| **action** | `tap`, `type`, `launch`, `foreground`, `screenshot PATH`, `devicekit install`, `devicekit start` | `{"ok":true}` |
 | **data** | `map`, `diff map`, `dump`, `rpc`, `health`, `devicekit status` | envelope with `command`, `result`, optional `meta` |
 
 ```python
@@ -491,40 +491,54 @@ No RPC; reads `last-map.json` only. If missing → `usage` error with hint `xq-i
 
 ## 8. Command → RPC mapping
 
-| CLI command | `ensure_runtime` | DeviceKit method | Notes |
+| CLI command | `ensure_runtime` | DeviceKit method | Tier / notes |
 | --- | --- | --- | --- |
-| `health` | no | _(HTTP only)_ | |
-| `rpc` | yes (default) | user `--method` | pass `--params` JSON |
-| `map` | yes | `device.dump.ui` | then assign refs, save MapStore |
-| `diff map` | no | — | local diff |
+| `health` | no | _(HTTP only)_ | **data** — `{reachable, baseUrl}` |
+| `map` | yes | `device.dump.ui` | **data** — refs + summary; save MapStore |
+| `diff map` | no | — | **data** — local diff |
 | `tap` | yes | `device.io.tap` | **action** → `{"ok":true}` |
 | `type` | yes | `device.io.text` (+ optional pre-tap) | **action** |
-| `screenshot` | yes | `device.screenshot` | **action**; **`-o PATH` required**; decode base64 to file only |
+| `screenshot` | yes | `device.screenshot` | **action**; **positional PATH** |
 | `launch` | yes | `device.apps.launch` | **action** |
-| `foreground` | yes | `device.apps.foreground` | **data** (returns bundle info) |
+| `foreground` | yes | `device.apps.foreground` | **data** — bundle info |
 | `dump` | yes | `device.dump.ui` | **data** — raw upstream `result` |
-| `map` | yes | `device.dump.ui` | **data** — CLI-shaped `refs` + `summary` |
-| `diff map` | no | — | **data** — local diff only |
-| `rpc` | yes | user method | **data** — raw `result` |
-| `health` | no | HTTP only | **data** — `{ "reachable": true, "baseUrl": "..." }` |
+| `rpc` | yes (default) | user `--method` | **data** — raw `result`; `--params` JSON |
 | `devicekit install` | no | — | **action** |
 | `devicekit start` | no | — | **action** |
 | `devicekit status` | no | — | **data** |
 
-### 8.1 Fire CLI wiring (`cli/root.py`)
+### 8.1 CLI invocation — positional-first (locked)
+
+No `--` required on the agent hot path. Match Vibium brevity.
+
+```bash
+xq-ios-act map
+xq-ios-act tap @e3
+xq-ios-act tap 120 44
+xq-ios-act type @e2 hello
+xq-ios-act screenshot /tmp/s.png
+xq-ios-act launch com.example.app
+xq-ios-act diff map
+```
+
+Optional long flags for scripts: `--x`, `--y`, `--ref`, `--path`, `--bundle-id`, `--method`.
+
+**Globals via env** (keeps argv short): `XQ_IOS_ACT_BASE_URL`, `XQ_IOS_ACT_TIMEOUT`. Constructor flags `--base-url` / `--timeout` override when set.
+
+### 8.2 Fire CLI wiring (`cli/root.py`)
 
 ```python
 class XqIosAct:
     def __init__(self, base_url=..., timeout=30, pretty=False, ensure_runtime=True): ...
     def health(self): ...
     def map(self, out=None): ...
-    def tap(self, e=None, x=None, y=None): ...  # Fire: tap --e=@e3 or positional
-    def type(self, text, ref=None): ...
-    def screenshot(self, o=None): ...
+    def tap(self, *args): ...       # @e3 | x y ints — parse positionals
+    def type(self, *args): ...      # [@eN] TEXT
+    def screenshot(self, path): ... # positional path
     def launch(self, bundle_id): ...
     def foreground(self): ...
     def dump(self): ...
-    def rpc(self, method, params=None): ...
+    def rpc(self, method, params=None): ...  # method positional; params JSON string optional 2nd
 
 class Diff:
     def __init__(self, parent: XqIosAct): ...
