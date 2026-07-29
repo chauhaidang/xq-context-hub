@@ -551,7 +551,7 @@ class DeviceKit:
     def status(self, device=None): ...
 ```
 
-**Fire positional `@e3`:** accept `e` flag `--e=@e3` and bare positional where Fire allows; document in `--help` examples.
+**Fire positionals:** thin `argv` preprocessor before Fire for `tap @e3`, `type @e2 text`, `screenshot /path` (Fire mishandles `@refs`). Long `--flags` remain optional.
 
 ---
 
@@ -742,7 +742,7 @@ jobs:
 | Unknown ref `@e99` | `usage` | `xq-ios-act map` |
 | No last map | `usage` | `xq-ios-act map` |
 | Missing profile (device install) | `usage` | `xq-ios-act devicekit install --device UDID --provisioning-profile PATH` |
-| Missing `-o` on screenshot | `usage` | `xq-ios-act screenshot -o /tmp/screen.png` |
+| Missing screenshot path | `usage` | `xq-ios-act screenshot /tmp/screen.png` |
 | DeviceKit RPC error | `rpc` | include upstream `message` in `error.message` |
 
 ---
@@ -751,8 +751,8 @@ jobs:
 
 ```bash
 xq-ios-act map                    # data — parse refs from .result
-xq-ios-act tap --e=@e3            # action — {"ok":true} (11 bytes)
-xq-ios-act type --ref=@e2 "hi"  # action
+xq-ios-act tap @e3
+xq-ios-act type @e2 hi
 xq-ios-act diff map             # data
 ```
 

@@ -194,8 +194,9 @@ Hybrid: MobileCLI install/start patterns + Vibium `ensure_runtime`.
 | 6 | Clients | Python primary + Swift optional (WP1b) |
 | 7 | Distribution | `uv tool install` / `swift build` |
 | 8 | Output | JSON default; `--pretty`; exit codes 0/2/3/4/5 |
-| 9 | Screenshot | **`-o PATH` required**; action-tier `{"ok":true}` on stdout |
-| 10 | Response contract | **Action** → `{"ok":true}`; **Data** → map/diff/dump/rpc/health |
+| 9 | Screenshot | positional PATH; action-tier `{"ok":true}` |
+| 10 | CLI argv | **Positional-first** — no `--` on hot path; env for globals |
+| 11 | Response contract | Action → `{"ok":true}`; Data → map/diff/dump/rpc/health |
 | 10 | Skill | WP2 follow-on |
 | 11 | CI | Linux unit default; optional macOS live gate WP3 |
 | 12 | Cloud (Perfecto, etc.) | **v2** — fleet proxy or Appium adapter |
