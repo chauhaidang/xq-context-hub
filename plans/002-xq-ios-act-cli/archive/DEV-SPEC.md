@@ -722,6 +722,7 @@ Original dual-client checklist (not shipped):
 
 ## 17. Links
 
+- Implementation: [`IMPLEMENTATION.md`](IMPLEMENTATION.md)
 - Design: [`DESIGN.md`](DESIGN.md)
 - Plan: [`PLAN.md`](PLAN.md)
 - Vibium benchmark: [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
