@@ -95,7 +95,7 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **Swift CLI** (`xq-ios-act`
 - [x] CI green on module PR
 - [ ] Approved v1 command surface works against live DeviceKit (manual or opt-in CI — WP3)
 
-### Snap commands _(draft)_
+### Snap commands
 
 ```bash
 cd checkouts/xq-versastack/modules/xq-ios-act-cli
