@@ -3,7 +3,7 @@
 - **ID**: `002-xq-ios-act-cli`
 - **Hub issue**: https://github.com/chauhaidang/xq-context-hub/issues/7
 - **Domains**: harness (`domains/harness/CONTEXT.md`) — `xq-versastack` only
-- **Status**: in_progress — implementation in review; **track progress on the issue**
+- **Status**: **done** (module merged) — follow-ons tracked on [issue #7](https://github.com/chauhaidang/xq-context-hub/issues/7)
 
 ## Goal
 
@@ -14,7 +14,7 @@ Ship `modules/xq-ios-act-cli/` in `xq-versastack`: a **Swift CLI** (`xq-ios-act`
 | Concern | Location |
 | --- | --- |
 | **Progress / checklist** | [Hub issue #7](https://github.com/chauhaidang/xq-context-hub/issues/7) |
-| **Code, tests, README** | [xq-versastack PR #8](https://github.com/chauhaidang/xq-versastack/pull/8) → `modules/xq-ios-act-cli/` |
+| **Code, tests, README** | `xq-versastack` `modules/xq-ios-act-cli/` ([merged PR #8](https://github.com/chauhaidang/xq-versastack/pull/8)) |
 | **Historical design** | [`archive/`](archive/) — original dual-client DESIGN/DEV-SPEC; not source of truth |
 
 ## Target repo
@@ -29,7 +29,7 @@ Tracked on [issue #7](https://github.com/chauhaidang/xq-context-hub/issues/7). S
 
 - [x] Swift CLI + `devicekit install` / `start` / `status`
 - [x] `swift test` + macOS CI without live DeviceKit
-- [ ] Versastack PR merged
+- [x] Versastack PR merged ([#8](https://github.com/chauhaidang/xq-versastack/pull/8))
 - [ ] Consumer docs updated in versastack
 
 ## Snap commands
