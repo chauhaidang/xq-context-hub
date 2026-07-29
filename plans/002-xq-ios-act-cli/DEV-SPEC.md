@@ -49,9 +49,9 @@ modules/xq-ios-act-cli/
       start-sim.sh             # argv: udid [port] → writes device.json fields
       start-device.sh          # argv: udid [port]
   contract/                    # golden envelopes (optional P9, recommended)
-    health.ok.json
+    action.ok.json             # {"ok":true}
     map.ok.json
-    tap.ref.ok.json
+    diff-map.ok.json
     error.transport.json
   tsr/                         # test evidence (gitignored or committed per module policy)
   python/
@@ -66,7 +66,7 @@ modules/xq-ios-act-cli/
       envelope.py              # success/failure JSON + pretty formatters
       exit_codes.py
       runtime.py               # ensure_runtime()
-      kit_call.py              # kit_call(config, transport, method, params)
+      kit_call.py              # kit_call + kit_action
       map_store.py             # MapStore: load/save/invalidate/resolve
       map_refs.py              # assign @e1..@eN from device.dump.ui tree
       diff_map.py              # line diff for diff map
@@ -216,7 +216,51 @@ Default `state_dir`: `Path.home() / ".xq-ios-act"`.
 
 ## 5. JSON envelope (normative)
 
-### 5.1 Success
+### 5.0 Response tiers (locked)
+
+| Tier | Commands | Success JSON |
+| --- | --- | --- |
+| **action** | `tap`, `type`, `launch`, `foreground`, `screenshot` (with `-o`), `devicekit install`, `devicekit start` | `{"ok":true}` |
+| **data** | `map`, `diff map`, `dump`, `rpc`, `health`, `devicekit status` | envelope with `command`, `result`, optional `meta` |
+
+```python
+class ResponseTier(StrEnum):
+    ACTION = "action"
+    DATA = "data"
+
+COMMAND_TIER: dict[str, ResponseTier] = {
+    "tap": ResponseTier.ACTION,
+    "type": ResponseTier.ACTION,
+    "launch": ResponseTier.ACTION,
+    "foreground": ResponseTier.ACTION,
+    "screenshot": ResponseTier.ACTION,
+    "devicekit.install": ResponseTier.ACTION,
+    "devicekit.start": ResponseTier.ACTION,
+    "map": ResponseTier.DATA,
+    "diff.map": ResponseTier.DATA,
+    "dump": ResponseTier.DATA,
+    "rpc": ResponseTier.DATA,
+    "health": ResponseTier.DATA,
+    "devicekit.status": ResponseTier.DATA,
+}
+```
+
+### 5.1 Action tier success
+
+```python
+ACTION_OK: dict[str, bool] = {"ok": True}
+
+def emit_action_ok(*, pretty: bool) -> None:
+    if pretty:
+        print("ok")
+    else:
+        print('{"ok":true}')
+    sys.exit(0)
+```
+
+No `command`, `result`, or `meta` on success. Agents chain with `&&` and only parse stdout on `map` / `diff map`.
+
+### 5.2 Data tier success
 
 ```python
 def success_envelope(
@@ -225,8 +269,7 @@ def success_envelope(
     *,
     base_url: str,
     method: str | None = None,
-    duration_ms: int,
-    rpc_id: int | None = None,
+    duration_ms: int | None = None,
     extra_meta: dict[str, Any] | None = None,
 ) -> dict[str, Any]: ...
 ```
@@ -234,20 +277,20 @@ def success_envelope(
 ```json
 {
   "ok": true,
-  "command": "tap",
-  "result": {},
-  "meta": {
-    "baseUrl": "http://127.0.0.1:12004",
-    "method": "device.io.tap",
-    "durationMs": 12,
-    "rpcId": 1
-  }
+  "command": "map",
+  "result": {
+    "refs": { "@e1": { "label": "Sign In", "role": "button", "center": {"x": 60, "y": 42} } },
+    "summary": { "count": 42, "refRange": ["@e1", "@e42"] }
+  },
+  "meta": { "baseUrl": "http://127.0.0.1:12004", "method": "device.dump.ui", "durationMs": 38 }
 }
 ```
 
-Commands without RPC (`health`, `devicekit install`, `diff map`) omit `method` / `rpcId` or set `method: null`.
+**`map` result** is CLI-shaped (refs + summary). Optional `--include-raw` adds `raw` key (DeviceKit tree). Default off for speed/size.
 
-### 5.2 Failure
+**`dump` / `rpc`:** `result` = upstream DeviceKit JSON-RPC `result` verbatim.
+
+### 5.3 Failure (all tiers)
 
 ```python
 class ErrorKind(StrEnum):
@@ -266,18 +309,17 @@ def failure_envelope(
 ) -> dict[str, Any]: ...
 ```
 
-### 5.3 Emit
+### 5.4 Emit
 
 ```python
-def emit(envelope: dict, *, pretty: bool) -> None:
-    if pretty:
-        print(format_pretty(envelope), file=sys.stdout if envelope["ok"] else sys.stderr)
-    else:
-        print(json.dumps(envelope, separators=(",", ":")), file=sys.stdout)
-    sys.exit(envelope.get("exitCode", 0) if not envelope["ok"] else 0)
+def emit(envelope: dict | None, *, pretty: bool, tier: ResponseTier) -> None:
+    if tier == ResponseTier.ACTION and envelope is None:
+        emit_action_ok(pretty=pretty)
+        return
+    ...
 ```
 
-**Rule:** JSON mode always prints envelope to **stdout** (including failures). Pretty mode: success stdout, error + hint stderr.
+**Rule:** JSON mode: action success is exactly `{"ok":true}` (no trailing newline requirement beyond one `\n`). Data/failure use compact `json.dumps`.
 
 ---
 
@@ -320,10 +362,19 @@ One connection per `call()` in v1.
 
 **Response handling:**
 
-- Parse JSON; if `error` present → raise `RpcError` (exit 4)
-- Return `result` verbatim to envelope
+- Parse JSON frame; if `error` present → raise `RpcError` (exit 4)
+- **Action calls:** use `call_action()` — verify `error` is absent; **do not parse/decode `result`**
+- **Data calls:** use `call()` — return `result` verbatim
 - WS connect/read timeouts → `TransportError` (exit 3)
 - Malformed JSON → `InternalError` (exit 5)
+
+```python
+async def call_action(self, method: str, params: Any | None, *, rpc_id: int = 1) -> None:
+    """Success = no JSON-RPC error. Discards result body for speed."""
+
+async def call(self, method: str, params: Any | None, *, rpc_id: int = 1) -> JSONRPCResponse:
+    """Full parse for data tier."""
+```
 
 ### 6.3 HTTP health (`http_health.py`)
 
@@ -333,15 +384,23 @@ One connection per `call()` in v1.
 
 For unit tests. Configurable canned responses per method. Default: connection refused for integration-style negative tests.
 
-### 6.5 `kit_call`
+### 6.5 `kit_call` / `kit_action`
 
 ```python
+async def kit_action(
+    config: Config,
+    transport: DeviceKitTransport,
+    method: str,
+    params: Any | None = None,
+) -> None:
+    await transport.call_action(method, params)  # raises on error
+
 async def kit_call(
     config: Config,
     transport: DeviceKitTransport,
     method: str,
     params: Any | None = None,
-) -> tuple[Any, int]:  # (result, duration_ms)
+) -> tuple[Any, int]:
     started = time.perf_counter()
     resp = await transport.call(method, params)
     if resp.error:
@@ -349,7 +408,7 @@ async def kit_call(
     return resp.result, int((time.perf_counter() - started) * 1000)
 ```
 
-Sync CLI entrypoints use `asyncio.run(...)`.
+Action command handlers call `kit_action` then `emit_action_ok`. Map/dump/rpc call `kit_call`.
 
 ---
 
@@ -438,15 +497,19 @@ No RPC; reads `last-map.json` only. If missing → `usage` error with hint `xq-i
 | `rpc` | yes (default) | user `--method` | pass `--params` JSON |
 | `map` | yes | `device.dump.ui` | then assign refs, save MapStore |
 | `diff map` | no | — | local diff |
-| `tap` | yes | `device.io.tap` | `params: {x, y, deviceId: "any"}` |
-| `type` | yes | `device.io.text` | optional tap ref first via `device.io.tap` |
-| `screenshot` | yes | `device.screenshot` | `-o` writes decoded PNG |
-| `launch` | yes | `device.apps.launch` | `{"bundleId": "..."}` |
-| `foreground` | yes | `device.apps.foreground` | |
-| `dump` | yes | `device.dump.ui` | raw in `result`, no refs |
-| `devicekit install` | no | — | subprocess scripts |
-| `devicekit start` | no | — | subprocess scripts + health poll |
-| `devicekit status` | no | — | simctl/devicectl + health |
+| `tap` | yes | `device.io.tap` | **action** → `{"ok":true}` |
+| `type` | yes | `device.io.text` (+ optional pre-tap) | **action** |
+| `screenshot` | yes | `device.screenshot` | **action**; **`-o PATH` required**; decode base64 to file only |
+| `launch` | yes | `device.apps.launch` | **action** |
+| `foreground` | yes | `device.apps.foreground` | **data** (returns bundle info) |
+| `dump` | yes | `device.dump.ui` | **data** — raw upstream `result` |
+| `map` | yes | `device.dump.ui` | **data** — CLI-shaped `refs` + `summary` |
+| `diff map` | no | — | **data** — local diff only |
+| `rpc` | yes | user method | **data** — raw `result` |
+| `health` | no | HTTP only | **data** — `{ "reachable": true, "baseUrl": "..." }` |
+| `devicekit install` | no | — | **action** |
+| `devicekit start` | no | — | **action** |
+| `devicekit status` | no | — | **data** |
 
 ### 8.1 Fire CLI wiring (`cli/root.py`)
 
@@ -598,7 +661,7 @@ Mirror Python seams. **Contract tests:** decode golden JSON from `contract/` in 
 
 | Test file | Covers |
 | --- | --- |
-| `test_envelope.py` | JSON shape, pretty format, exit mapping |
+| `test_envelope.py` | action `{"ok":true}`, data envelope, pretty format, exit mapping |
 | `test_map_refs.py` | ref assignment on fixture tree |
 | `test_map_store.py` | save/load/invalidate/resolve_tap |
 | `test_diff_map.py` | added/removed lines |
@@ -665,11 +728,25 @@ jobs:
 | Unknown ref `@e99` | `usage` | `xq-ios-act map` |
 | No last map | `usage` | `xq-ios-act map` |
 | Missing profile (device install) | `usage` | `xq-ios-act devicekit install --device UDID --provisioning-profile PATH` |
-| DeviceKit RPC error | `rpc` | include upstream `message`; no generic hint |
+| Missing `-o` on screenshot | `usage` | `xq-ios-act screenshot -o /tmp/screen.png` |
+| DeviceKit RPC error | `rpc` | include upstream `message` in `error.message` |
 
 ---
 
-## 15. Dev wave handoff checklist
+## 15. Agent chaining (action tier)
+
+```bash
+xq-ios-act map                    # data — parse refs from .result
+xq-ios-act tap --e=@e3            # action — {"ok":true} (11 bytes)
+xq-ios-act type --ref=@e2 "hi"  # action
+xq-ios-act diff map             # data
+```
+
+Action success never includes `command`, `result`, or `meta`. Failures always use full error envelope.
+
+---
+
+## 16. Dev wave handoff checklist
 
 Before opening delivery PR:
 
@@ -683,7 +760,7 @@ Before opening delivery PR:
 
 ---
 
-## 16. Links
+## 17. Links
 
 - Design: [`DESIGN.md`](DESIGN.md)
 - Plan: [`PLAN.md`](PLAN.md)

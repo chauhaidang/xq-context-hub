@@ -95,10 +95,10 @@ xq-ios-act diff map
 | Clients | Python 3.14 primary + Swift 5.9+ optional; same contract |
 | Distribution | `uv tool install xq-ios-act` / `swift build -c release` |
 | Transport | WS `/ws` for RPC; HTTP `/health` only |
-| Output | JSON default; `--pretty` for humans; exit codes 0/2/3/4/5 |
+| Output | JSON default; **action tier = `{"ok":true}`**; data tier for map/diff; `--pretty`; exit 0/2/3/4/5 |
 | Refs | Client-side `MapStore` at `~/.xq-ios-act/` |
 | Lifecycle | Own `devicekit install/start/status`; no MobileCLI |
-| Screenshot | Wrapper in v1; base64 in JSON + optional `-o PATH` |
+| Screenshot | **`-o PATH` required**; stdout action-tier `{"ok":true}` |
 | Skill | WP2 follow-on (not blocking v1 ship) |
 | Swift timing | WP1b parallel with Python if capacity |
 | Cloud (Perfecto, etc.) | **Out of v1** — v2 fleet proxy or Appium adapter |
@@ -487,43 +487,71 @@ Per [CLI for agents](https://github.com/chauhaidang/xq-context-hub) conventions:
 2. **Examples on every `--help`** — real copy-paste invocations
 3. **Actionable errors** — stderr includes `hint` with a correct example command
 4. **Idempotent where possible** — `health`, `dump` are read-only; `launch` may no-op if already foreground (document DeviceKit behavior)
-5. **Success output** — default: compact JSON envelope (below); `--pretty`: concise human summary on stdout
+5. **Success output** — tiered by command class (§ Response contract); default compact JSON
 6. **Errors follow the same mode** — default: JSON envelope with `ok: false`; `--pretty`: one-line message + `hint` on stderr
+
+### Response contract (two tiers — locked)
+
+Agents chain many **actions** in tight loops (`tap`, `type`, `launch`). Parsing large JSON per action is wasted I/O. **Inspection** commands (`map`, `diff map`) keep rich payloads.
+
+| Tier | Commands | Success stdout (JSON default) | DeviceKit wire |
+| --- | --- | --- | --- |
+| **Action** (minimal) | `tap`, `type`, `launch`, `foreground`, `screenshot` (with `-o`) | `{"ok":true}` only — no `command`, `result`, or `meta` | Send RPC; confirm no JSON-RPC `error`; **discard `result` body** (do not re-serialize upstream payload) |
+| **Data** (rich) | `map`, `diff map`, `dump`, `rpc`, `health`, `devicekit status` | Full envelope with `result` (see below) | Parse and forward `result` as needed |
+| **Lifecycle** (minimal) | `devicekit install`, `devicekit start` | `{"ok":true}` on success | N/A (host scripts) |
+
+**`screenshot`:** require **`-o PATH`** in v1 for the action fast path (write file, stdout `{"ok":true}`). Omitting `-o` is a **usage error** (exit 2) with hint — avoids base64 blobs on the hot path.
+
+**`rpc`:** always **Data** tier — escape hatch keeps raw DeviceKit `result`.
+
+**Pretty mode:** Action tier prints `ok` (one word). Data tier keeps concise summaries (unchanged for `map` / `diff map`).
+
+**Transport optimization (implementation):** For Action tier, WS client checks JSON-RPC `error` only; skip decoding/allocating large `result` trees. Use `orjson` or minimal JSON scan if helpful; do not build Python dict for upstream `result` on action calls.
 
 ### JSON output envelope
 
-**Success:**
+#### Action tier success
+
+```json
+{"ok":true}
+```
+
+#### Data tier success
 
 ```json
 {
   "ok": true,
-  "command": "dump",
-  "result": { "elements": [] },
+  "command": "map",
+  "result": { "refs": { "@e1": { "label": "Sign In", "role": "button" } }, "summary": { "count": 42 } },
   "meta": {
     "baseUrl": "http://127.0.0.1:12004",
     "method": "device.dump.ui",
-    "durationMs": 38,
-    "rpcId": 1
+    "durationMs": 38
   }
 }
 ```
 
-**Failure:**
+`map` **`result`** is **CLI-shaped** (refs + summary + optional `raw` when `--include-raw`): not a blind passthrough of DeviceKit. `dump` and `rpc` pass through upstream `result`. `diff map` `result` is diff lines only (no RPC).
+
+#### Failure (all tiers)
 
 ```json
 {
   "ok": false,
-  "command": "dump",
   "error": {
     "kind": "transport",
     "message": "Connection refused",
-    "hint": "xq-ios-act health --base-url http://127.0.0.1:12004"
+    "hint": "xq-ios-act devicekit start --sim"
   },
   "exitCode": 3
 }
 ```
 
-`result` is the **raw DeviceKit JSON-RPC result** (no lossy re-shaping) so agents can rely on upstream semantics.
+Failures always include `error` + `exitCode`. Omit `command` on action-tier failures unless already known (optional).
+
+~~`result` is the **raw DeviceKit JSON-RPC result** (no lossy re-shaping) so agents can rely on upstream semantics.~~
+
+**Data tier only:** `dump` and `rpc` return raw DeviceKit `result`. `map` returns assigned `@refs` (agent contract). Action tier returns no `result`.
 
 ### Pretty output (human mode)
 
@@ -537,7 +565,10 @@ $ xq-ios-act map --pretty
 map  42 elements  @e1..@e42  saved ~/.xq-ios-act/last-map.json
 
 $ xq-ios-act tap @e3 --pretty
-tap  @e3  (120, 44)  ok
+ok
+
+$ xq-ios-act map --pretty
+map  42 elements  @e1..@e42  saved ~/.xq-ios-act/last-map.json
 ```
 
 Errors with `--pretty`: stderr shows `error: …` and `hint: …`; exit code unchanged.
@@ -759,14 +790,15 @@ On failure, return JSON with `hint`, e.g.:
 | D13 | `ensure_runtime()` + `devicekit start` — Vibium auto-start equivalent for simulator (and device when profile already used at install) |
 | D14 | `devicekit install` + `start` + `status` in v1 (WP1c); no MobileCLI binary dependency |
 | D15 | **v1 scope:** local sim + USB device only; cloud farms deferred to v2 |
-| D16 | **Screenshot v1:** convenience wrapper; base64 in `result` + `-o PATH` |
+| D16 | **Two-tier responses** — Action `{"ok":true}`; Data for map/diff/dump/rpc/health |
 | D17 | **Skill WP2** — not blocking v1 module ship |
+| D18 | **Screenshot v1:** `-o PATH` required; no base64 on stdout |
 
 ---
 
 ## Resolved (was open)
 
-1. **Screenshot** — base64 in JSON `result` + optional `-o PATH`; `--pretty` prints path/summary.
+1. **Screenshot** — **locked:** `-o PATH` required; action-tier `ok` only.
 2. **Swift in v1** — WP1b; parallel with Python when capacity allows.
 3. **Versastack PR #8** — close or rebase premature scaffold into `swift/` per module layout.
 4. **Cloud devices** — out of v1; MobileCLI fleet pattern or Appium adapter in v2.
