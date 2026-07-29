@@ -2,15 +2,21 @@
 
 - **Plan**: [`PLAN.md`](PLAN.md)
 - **Design**: [`DESIGN.md`](DESIGN.md)
+- **As built**: [`IMPLEMENTATION.md`](IMPLEMENTATION.md) — **authoritative for shipped versastack module**
 - **Role**: `engineer-in-design` → handoff to `engineer-in-dev` / `engineer-in-test` / `engineer-in-devops`
 - **Target repo**: `xq-versastack` → `modules/xq-ios-act-cli/`
 - **Branch**: `xq/xq-ios-act-cli-f8f1`
+- **Status**: **implemented (Swift-only)** — versastack [PR #8](https://github.com/chauhaidang/xq-versastack/pull/8)
+
+> **Note:** This spec describes the original dual-client implementation plan. The versastack module shipped **Swift-only** (Python POC removed). Use IMPLEMENTATION.md for as-built layout, phases, and verification. Sections below remain for contract reference.
 
 This document is the **implementation contract**. If DEV-SPEC disagrees with DESIGN on implementation detail, fix DEV-SPEC or escalate. Product behavior is locked in DESIGN.
 
 ---
 
 ## 1. Implementation phases
+
+**As built (versastack):** Swift P0–P7 + devicekit lifecycle in one workstream; 10 `swift test` cases; macOS CI only. Python phases (P0–P7 Python, P8 mirror) were not shipped.
 
 Build in order within each workstream. **WP1c** can start after transport + envelope land.
 
@@ -32,113 +38,49 @@ Build in order within each workstream. **WP1c** can start after transport + enve
 
 ---
 
-## 2. Repository layout (final)
+## 2. Repository layout (as built)
 
 ```text
 modules/xq-ios-act-cli/
   README.md
   scripts/
-    run-python.sh              # cd python && uv sync && pytest + static
-    run-swift.sh               # macOS: swift test; else exit 0 with skip message
-    run-all.sh                 # both
+    run-swift.sh               # macOS: swift test
+    run-all.sh                 # swift test
     devicekit/
       fetch-release.sh         # stdout: path to downloaded artifact
-      resign-ipa.sh            # argv: ipa profile udid [identity] → stdout: signed ipa path
-      install-sim.sh           # argv: zip_or_app udid
-      install-device.sh        # argv: ipa udid
-      start-sim.sh             # argv: udid [port] → writes device.json fields
-      start-device.sh          # argv: udid [port]
-  contract/                    # golden envelopes (optional P9, recommended)
-    action.ok.json             # {"ok":true}
+      install-sim.sh             # argv: zip_or_app udid
+      install-device.sh          # argv: ipa udid
+  contract/                    # golden envelopes
+    action.ok.json
     map.ok.json
     diff-map.ok.json
     error.transport.json
-  tsr/                         # test evidence (gitignored or committed per module policy)
-  python/
-    pyproject.toml
-    uv.lock
-    src/xq_ios_act/
-      __init__.py
-      __main__.py              # entry: fire.Fire(...)
-      cli/
-        root.py                # XqIosAct, Diff, DeviceKit Fire classes
-      config.py                # Config, paths, env overrides
-      envelope.py              # success/failure JSON + pretty formatters
-      exit_codes.py
-      runtime.py               # ensure_runtime()
-      kit_call.py              # kit_call + kit_action
-      map_store.py             # MapStore: load/save/invalidate/resolve
-      map_refs.py              # assign @e1..@eN from device.dump.ui tree
-      diff_map.py              # line diff for diff map
-      transport/
-        __init__.py
-        protocol.py            # DeviceKitTransport Protocol
-        http_health.py
-        ws_jsonrpc.py
-        mock.py
-      commands/
-        health.py
-        rpc.py
-        map_cmd.py
-        tap.py
-        type_cmd.py
-        screenshot.py
-        launch.py
-        foreground.py
-        dump.py
-      devicekit/
-        __init__.py
-        install.py
-        start.py
-        status.py
-        constants.py           # pinned version, checksums, bundle id suffix
-    tests/
-      test_envelope.py
-      test_exit_codes.py
-      test_map_store.py
-      test_map_refs.py
-      test_diff_map.py
-      test_transport_mock.py
-      test_ws_jsonrpc_codec.py
-      test_commands_health.py
-      test_commands_rpc.py
-      test_kit_call.py
-      conftest.py              # mock transport fixtures
   swift/
     Package.swift
     Sources/
-      XqIosAct/
-        Config.swift
-        Envelope.swift
-        ExitCodes.swift
-        MapStore.swift
-        MapRefs.swift
-        DiffMap.swift
-        KitCall.swift
-        Runtime.swift
-        Transport/
-          DeviceKitTransport.swift
-          HTTPHealth.swift
-          WSJSONRPC.swift
-          MockTransport.swift
-        Commands/              # thin; called from executable
-          ...
-      xq-ios-act/
-        XqIosActCLI.swift      # @main ArgumentParser root
-        Commands/
-          HealthCommand.swift
-          RpcCommand.swift
-          MapCommand.swift
-          ...
-    Tests/XqIosActTests/
-      EnvelopeTests.swift
-      MapStoreTests.swift
-      ...
+      IosAct/                  # library: transport, map, devicekit lifecycle
+      IosActCommand/           # xq-ios-act CLI
+    Tests/
 ```
+
+Resign (`ResignIPA.swift`), XCTestRun (`XCTestRun.swift`), and start (`DeviceKitStart.swift`) are Swift — not shell scripts.
+
+### Original layout (dual client — not shipped)
+
+<details>
+<summary>Python + Swift tree from original spec</summary>
+
+```text
+modules/xq-ios-act-cli/
+  scripts/run-python.sh, run-swift.sh, run-all.sh
+  python/src/xq_ios_act/ ...
+  swift/Sources/XqIosAct/ ...
+```
+</details>
 
 ---
 
-## 3. Python package metadata (`pyproject.toml`)
+## 3. Python package metadata (`pyproject.toml`) _(original — not shipped)_
 
 ```toml
 [project]
@@ -762,15 +704,19 @@ Action success never includes `command`, `result`, or `meta`. Failures always us
 
 ## 16. Dev wave handoff checklist
 
-Before opening delivery PR:
+**As built (versastack PR #8):**
+
+- [x] `bash scripts/run-swift.sh` / `swift test` green on macOS
+- [x] All v1 commands implemented (Swift)
+- [x] `devicekit install --sim` + `start` + `status` (manual verification)
+- [x] Golden `contract/` fixtures in Swift tests
+- [ ] `ensure_runtime` fully wired on all RPC verbs (partial)
+- [ ] README in versastack: consumer doc updates when merged
+
+Original dual-client checklist (not shipped):
 
 - [ ] `bash scripts/run-python.sh` green on Linux
-- [ ] `bash scripts/run-swift.sh` green on macOS (or skip message on Linux)
-- [ ] All v1 commands in §8 implemented (Python)
-- [ ] `devicekit install --sim` + `start` + `status` on booted sim (manual or live test)
-- [ ] `ensure_runtime` wired; `map` works after cold start on sim
-- [ ] README: prerequisites, zero→loop, real-device notes
-- [ ] Golden `contract/` fixtures match Python output (Swift optional P8)
+- [ ] Golden `contract/` fixtures match Python output
 
 ---
 

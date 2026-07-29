@@ -2,29 +2,25 @@
 
 - **Plan**: [`PLAN.md`](PLAN.md)
 - **Dev spec**: [`DEV-SPEC.md`](DEV-SPEC.md)
+- **As built**: [`IMPLEMENTATION.md`](IMPLEMENTATION.md) — **authoritative for shipped versastack module**
 - **Benchmark**: [`VIBIUM-BENCHMARK.md`](VIBIUM-BENCHMARK.md)
 - **Role**: `engineer-in-design`
-- **Status**: **ready** — design locked; proceed to WP1 after prototype sign-off
+- **Status**: **implemented (Swift-only)** — versastack [PR #8](https://github.com/chauhaidang/xq-versastack/pull/8). Sections below retain the original dual-client design for contract reference; see IMPLEMENTATION.md for deviations.
 - **Repo**: `xq-versastack` → `modules/xq-ios-act-cli/`
 
 ## Summary
 
-`xq-ios-act` is a **host-side CLI** (Python and optional Swift clients) that speaks **DeviceKit JSON-RPC over WebSocket**. It gives coding agents stable JSON output by default, optional `--pretty` for humans, and predictable exit codes — without MobileCLI as the control plane.
+`xq-ios-act` is a **host-side CLI** that speaks **DeviceKit JSON-RPC over WebSocket**. It gives coding agents stable JSON output by default, optional `--pretty` for humans, and predictable exit codes — without MobileCLI as the control plane.
 
-**Clients (locked):**
+**Client (as built):**
 
 | Client | Role | Distribution |
 | --- | --- | --- |
-| **Python 3.14** (primary) | Default for agents, Android path, Linux CI | **`uv tool install xq-ios-act`** |
-| **Swift 5.9+** (optional) | macOS-native alternative; Xcode/sim toolchain alignment | **`swift build`** → `.build/release/xq-ios-act` |
+| **Swift 5.9+** | macOS CLI + `IosAct` library; Xcode/sim toolchain | **`swift build`** → `.build/release/xq-ios-act` |
 
-Both clients implement the **same CLI contract** (verbs, flags, JSON envelope, exit codes, `~/.xq-ios-act/` state). Install **one** on `PATH` — not both as `xq-ios-act` simultaneously.
+**Original design (superseded in versastack):** Python 3.14 primary + Swift optional; same CLI contract. Python POC was removed; a future Python client may return for Android transport only.
 
-**Packaging (Python, locked):** **[uv](https://docs.astral.sh/uv/)** + **`pyproject.toml`** + **`uv.lock`**.
-
-**CLI (Python, locked):** **[Google Fire](https://github.com/google/python-fire)**.
-
-**CLI (Swift, locked):** **[swift-argument-parser](https://github.com/apple/swift-argument-parser)** — same flat verb tree as Python.
+**CLI (Swift, as built):** **[swift-argument-parser](https://github.com/apple/swift-argument-parser)** — flat verb tree per contract below.
 
 **Agent UX (locked):** Vibium-shaped flat verbs — `map` → `@ref` → `tap` → `diff map` (see [VIBIUM-BENCHMARK.md](VIBIUM-BENCHMARK.md)).
 
@@ -352,30 +348,25 @@ DeviceKit method names stay upstream (`device.io.tap`, `device.dump.ui`); CLI ve
 | `devicekit stop` | _(no direct equivalent)_ | v1.1 |
 | `devicekit uninstall` | `mobilecli agent uninstall` | v1.1 |
 
-### Module layout (dual client — target after prototypes)
+### Module layout (as built — Swift-only)
 
 ```text
 modules/xq-ios-act-cli/
-  README.md                      # both clients; when to use which
-  scripts/
-    run-all.sh                   # python tests + swift test (macOS)
-    run-python.sh
-    run-swift.sh                 # macOS only; skip gracefully on Linux CI
-  tsr/
-  python/
-    pyproject.toml
-    uv.lock
-    src/xq_ios_act/              # Fire CLI + library
-    tests/
+  README.md
   swift/
     Package.swift
     Sources/
-      XqIosAct/                  # library
-      xq-ios-act/                # executable + Commands/
+      IosAct/                    # library
+      IosActCommand/             # xq-ios-act executable
     Tests/
+  scripts/
+    run-all.sh                   # swift test
+    run-swift.sh
+    devicekit/
+  contract/                      # golden JSON envelopes
 ```
 
-**No shared source code** between Python and Swift — **shared CLI contract** only (documented in this design). Optional `contract/` fixtures later: golden JSON outputs per command.
+**CLI contract** is documented in this design and validated via `contract/` fixtures. Original dual-client layout (Python + Swift) was superseded — see [`IMPLEMENTATION.md`](IMPLEMENTATION.md).
 
 ### Python architecture
 
@@ -662,9 +653,10 @@ Launches the XCTest runner and makes `base-url` reachable. Called explicitly or 
 | Target | Steps (from MobileCLI patterns) |
 | --- | --- |
 | **Simulator** | Boot check → find runner bundle id → `LaunchAppWithEnv` with `DEVICEKIT_LISTEN_PORT` (default `12004`) → poll `GET /health` |
-| **Real device** | Tunnel (iOS 17+, go-ios or documented `ios tunnel`) → port-forward host→device `12004` → `LaunchTestRunner` with `devicekit-iosUITests.xctest` → poll `/health` → optional HOME to background runner |
+| **Real device** _(original)_ | Tunnel (iOS 17+, go-ios) → port-forward `12004` → `LaunchTestRunner` |
+| **Real device** _(as built)_ | Unsigned IPA + Swift resign → `devicectl install` → **`xcodebuild test-without-building`** (`DeviceKitUITests/testRunAutomation`) → poll `/health`. No go-ios tunnel, no iproxy. |
 
-Persist forward metadata under `~/.xq-ios-act/device.json` (`deviceId`, `forwardPort`, `bundleId`) so subsequent commands reuse the forwarder.
+Persist device metadata under `~/.xq-ios-act/device.json` (`deviceId`, `bundleId`, etc.).
 
 ### `devicekit status` (v1)
 
@@ -688,7 +680,7 @@ JSON envelope:
 | Target | Artifact | Signing | Install tool |
 | --- | --- | --- | --- |
 | **Simulator** | `devicekit-ios-Sim-*.zip` from releases | None | `simctl install` / XCTest launch |
-| **Real device** | `devicekit-ios-runner.ipa` (unsigned) | **Re-sign** with user's `.mobileprovision` | `xcrun devicectl` or `go-ios` |
+| **Real device** | `devicekit-ios-runner.ipa` (unsigned) | **Re-sign** (Swift `ResignIPA`) with user's `.mobileprovision` | `xcrun devicectl` |
 
 ### Re-sign requirements (real device)
 
@@ -714,26 +706,24 @@ Re-sign steps (implementation detail for dev):
 2. `xq-ios-act health` — must return `ok` before agent loop
 3. `xq-ios-act map` — begin Vibium-shaped loop
 
-### Implementation layout
+### Implementation layout (as built)
 
 ```text
 modules/xq-ios-act-cli/
+  swift/
+    Sources/IosAct/           # library (KitTransport, AgentLifecycle, ResignIPA, …)
+    Sources/IosActCommand/    # xq-ios-act CLI
+    Tests/
   scripts/devicekit/
     fetch-release.sh          # curl GitHub release asset + checksum
-    resign-ipa.sh             # unzip, provision, codesign, zip (MobileCLI ResignIPA)
-    install-sim.sh              # simctl install
-    install-device.sh           # devicectl or go-ios zipconduit
-    start-sim.sh                # LaunchAppWithEnv + health poll
-    start-device.sh             # tunnel + forward + LaunchTestRunner + health poll
-  python/src/xq_ios_act/
-    runtime.py                  # ensure_runtime()
-    devicekit/
-      install.py
-      start.py
-      status.py
+    install-sim.sh            # simctl install
+    install-device.sh         # devicectl install
+  contract/                   # golden JSON envelopes
+  scripts/run-swift.sh
+  scripts/run-all.sh          # swift test
 ```
 
-Swift client may shell out to same scripts (macOS-only) to avoid duplicating sign logic.
+Resign, XCTestRun generation, sim launch, and device `xcodebuild` start live in Swift (`ResignIPA.swift`, `XCTestRun.swift`, `DeviceKitStart.swift`). Shell scripts handle fetch + install only.
 
 ### Errors (agent-native)
 
