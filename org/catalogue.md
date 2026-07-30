@@ -8,7 +8,7 @@ choose a domain before opening product code.
 | Repo | Role |
 | --- | --- |
 | `xq-context-hub` | Org AI context home (this repo) |
-| `xq-versastack` | CLI tools box for AI agents |
+| `xq-versastacks` | CLI tools box for AI agents |
 | `xq-harness` | Polyglot testing monorepo; `@chauhaidang/xq-harness-*` packages; agent skills |
 
 ## Fitness

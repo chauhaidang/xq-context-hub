@@ -28,7 +28,7 @@ org-scoped.
 | Repo | Role |
 | --- | --- |
 | [`xq-harness`](https://github.com/chauhaidang/xq-harness) | Testing monorepo, published harness packages, engineering agent skills |
-| [`xq-versastack`](https://github.com/chauhaidang/xq-versastack) | Box of CLI tools for AI agents |
+| [`xq-versastacks`](https://github.com/chauhaidang/xq-versastacks) | Box of CLI tools for AI agents |
 | [`xq-toolbox`](https://github.com/chauhaidang/xq-toolbox) | Legacy monorepo of XQ application tools (prefer harness-lineage packages for new work) |
 
 ## Registry

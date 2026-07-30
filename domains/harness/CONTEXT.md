@@ -17,7 +17,7 @@ Harness owns:
 - engineering agent skills shipped with harness (`.agents/skills/`)
 - test environment CLI (`xq-test-infra`)
 - stub servers (`xq-stubby`, `xq-stub-server`)
-- agent CLI toolbox (`xq-versastack`)
+- agent CLI toolbox (`xq-versastacks`)
 
 Harness does not own:
 
@@ -58,7 +58,7 @@ Prefer the concrete repo name in task plans.
 | Repo | Role in this domain |
 | --- | --- |
 | `xq-harness` | Testing monorepo + harness packages + agent skills |
-| `xq-versastack` | CLI tools for AI agents |
+| `xq-versastacks` | CLI tools for AI agents |
 | `xq-test-infra` | Spin up test environments |
 | `xq-stubby` | Centralized stub server |
 | `xq-stub-server` | Stub framework (Camouflage) |
