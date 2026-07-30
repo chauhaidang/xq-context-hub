@@ -8,7 +8,8 @@ alwaysApply: false
 When `product-lead` assigns execution work:
 
 1. Wave roles `dev`/`test`/`devops` share one **branch** + Work Contract — spawn in parallel
-2. `design` before wave if needed; `review` only after **snap**
+2. `design` before wave if needed; `review` only after **snap** (include
+   `secret-safe-review.mdc` scan)
 3. Playbook: `.agents/skills/engineer-in/SKILL.md` + `docs/agents/parallel-wave.md`
 4. No delivery PR mid-wave
 

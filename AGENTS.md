@@ -18,6 +18,7 @@ Do not preload the whole hub. Do not paste long procedures into this file.
 - Product clones live only under `checkouts/<repo>/` ([`org/links.yaml`](org/links.yaml))
 - Never commit `checkouts/*` (only `checkouts/README.md` is tracked)
 - No secrets in git; commits / pushes / PRs only when the user asks
+- Post-snap review must run [`.cursor/rules/secret-safe-review.mdc`](.cursor/rules/secret-safe-review.mdc) before merge-ready
 - One PR per product repo
 
 ## Delegate (do not inline)
