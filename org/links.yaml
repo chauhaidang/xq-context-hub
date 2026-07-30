@@ -40,10 +40,11 @@ repos:
     url: git@github.com:chauhaidang/xq-harness.git
     domain: harness
     default_branch: main
-  xq-versastack:
-    url: git@github.com:chauhaidang/xq-versastack.git
+  xq-versastacks:
+    url: git@github.com:chauhaidang/xq-versastacks.git
     domain: harness
     default_branch: main
+    notes: Replaces xq-versastack (retired after credential leak incident).
   xq-test-infra:
     url: git@github.com:chauhaidang/xq-test-infra.git
     domain: harness
