@@ -34,7 +34,7 @@ Success means: new modules and engineer-in-test waves can follow one documented 
 | --- | --- | --- |
 | Behavior | Modules verify independently; scout-kit has strong deterministic + some real-Scout paths; ios-act-cli is mostly **unit** (`swift test` + mocks), little/no DeviceKit e2e in CI; hub expects TSR but versastacks only documents commands + CI ownership | Explicit contract: required **unit + functional(e2e)**; each module documents and runs both; TSR names both layers |
 | Surfaces | `docs/module-verification.md`, `docs/module-ci.md`, per-module tests/tsr, `ci-<name>.yml` | Add `docs/module-testing.md`; pointers from verification / CI / `AGENTS.md` / `modules/README.md`; module READMEs document unit cmd + e2e cmd + runner prerequisites |
-| Evidence | Mixed richness; ios-act TSR is unit-shaped | TSR reports unit and e2e results (e2e may be skip-with-reason only when runner prerequisites are unavailable — must not claim pass) |
+| Evidence | Mixed richness; ios-act TSR is unit-shaped | TSR reports unit and e2e results; **Actions e2e jobs must run and pass** |
 
 ## Test approach
 
@@ -68,7 +68,7 @@ Success means: new modules and engineer-in-test waves can follow one documented 
 
 ## Acceptance criteria
 
-- [ ] `docs/module-testing.md` defines: **unit + functional(e2e) sufficient**; functional **= e2e**; mocks ≠ e2e; TSR fields; per-module CI ownership; anti-patterns (shared runner, calling mock-only tests “e2e”)
+- [ ] `docs/module-testing.md` defines: **unit + functional(e2e) sufficient**; functional **= e2e**; **Actions must run e2e**; mocks ≠ e2e; TSR fields; per-module CI ownership; anti-patterns (shared runner, skip-e2e-as-green, mocks labeled e2e)
 - [ ] `docs/module-verification.md` and `docs/module-ci.md` link to the testing contract
 - [ ] Root pointers (`AGENTS.md`, `modules/README.md`, README / CONSUMER_CONTEXT as needed) mention the contract
 - [ ] Both shipped modules audited for **unit + e2e**; e2e gaps **closed in Actions** (waivers only for physical-device extras, not for skipping Actions e2e)
