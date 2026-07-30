@@ -48,14 +48,14 @@ Success means: new modules and engineer-in-test waves can follow one documented 
   - `xq-scout-kit`: e2e = installed skill / real Scout path the module already models (`--real-scout` or equivalent documented command), not fakes-only as the sole functional proof
 - **Mocks-only CLI process tests** are useful **unit/helpers**, not a substitute for the e2e bar
 - **Static / contract** checks may sit inside unit or e2e suites; not a third mandatory tier
-- **Seams**: README documents `unit` and `e2e` commands; CI invokes what the runner can support; TSR under `modules/<name>/tsr/`
-- **Environments**: local snap runs unit + e2e when the host can; CI runs unit always and e2e when the workflow provides the runtime (macOS + sim for ios-act, etc.)
-- **Out of scope for this plan**: shared e2e infra across modules; physical-device-only gates
+- **Seams**: README documents `unit` and `e2e` commands; **GitHub Actions must run both**; TSR under `modules/<name>/tsr/`
+- **Environments**: local snap = unit + e2e; **CI (Actions) = unit + e2e** on a runner that hosts the module’s disposable runtime (macOS + Simulator + DeviceKit for ios-act; documented real-Scout path for scout-kit)
+- **Out of scope for this plan**: shared e2e infra across modules; physical-device-only gates; treating “skip e2e in Actions” as an acceptable done state for this wave
 
 ## Test coverage
 
 - [ ] Happy path: unit green for each shipped module
-- [ ] Happy path: e2e green for each shipped module on a documented disposable runtime (or explicit blocker if CI cannot host it yet — tracked on the module README + issue)
+- [ ] Happy path: e2e green for each shipped module on a documented disposable runtime **in GitHub Actions** (not local-only)
 - [ ] Failure / negative: unit and/or e2e negative coverage as appropriate to the entrypoint
 - [ ] Regression: no shared runner / reusable module CI / root matrix
 - [ ] Evidence artifact: TSR refreshes from documented commands; summary distinguishes **unit** vs **functional(e2e)**
@@ -71,8 +71,8 @@ Success means: new modules and engineer-in-test waves can follow one documented 
 - [ ] `docs/module-testing.md` defines: **unit + functional(e2e) sufficient**; functional **= e2e**; mocks ≠ e2e; TSR fields; per-module CI ownership; anti-patterns (shared runner, calling mock-only tests “e2e”)
 - [ ] `docs/module-verification.md` and `docs/module-ci.md` link to the testing contract
 - [ ] Root pointers (`AGENTS.md`, `modules/README.md`, README / CONSUMER_CONTEXT as needed) mention the contract
-- [ ] Both shipped modules audited for **unit + e2e**; gaps closed or explicitly waived with rationale + follow-up (primary gap: `xq-ios-act-cli` DeviceKit/Simulator e2e)
-- [ ] Documented verify commands refresh TSR; path-scoped CI invokes unit always and e2e when runner supports it
+- [ ] Both shipped modules audited for **unit + e2e**; e2e gaps **closed in Actions** (waivers only for physical-device extras, not for skipping Actions e2e)
+- [ ] Documented verify commands refresh TSR; path-scoped CI invokes **unit + e2e** on every relevant PR/push
 - [ ] Hub issue checklist reflects wave → snap → review → one PR
 
 ## Work Contract — xq-versastacks
@@ -86,13 +86,13 @@ Success means: new modules and engineer-in-test waves can follow one documented 
 - **Existing contracts**: `docs/module-verification.md`, `docs/module-ci.md` — keep command/CI ownership; testing doc owns unit vs e2e policy
 - **Reference / gap:**
   - `xq-scout-kit` — strong unit/deterministic + emerging real-Scout e2e (`--real-scout`); align naming to unit vs functional(e2e) in TSR/docs
-  - `xq-ios-act-cli` — unit exists; **add Simulator + DeviceKit e2e** (or README waiver + tracked follow-up if blocked on CI images)
+  - `xq-ios-act-cli` — unit exists; **add Simulator + DeviceKit e2e and run it in Actions** (macos runner + sim prerequisites)
 - **E2E seam (CLI modules):** real binary + real DeviceKit (sim); not mock `Transport` alone
 - **TSR minimum:**
   - `modules/<name>/tsr/summary.md` — pass/fail/skip counts, toolchain, commit/time, **unit vs functional(e2e)** coverage statement, per-case or per-suite table
   - `modules/<name>/tsr/junit.xml` (or named equivalent)
-  - If e2e cannot run on a given host, **skip with reason** — never mark e2e pass when not executed
-- **CI seam:** per-module `ci-<name>.yml` owns setup (incl. sim/DeviceKit prerequisites for e2e when enabled); no reusable module CI framework
+  - Actions e2e must **execute and pass** (or fail the job); do not ship “e2e skipped in CI” as green for this wave
+- **CI seam:** per-module `ci-<name>.yml` owns setup **including e2e runtime** (sim/DeviceKit for ios-act; real-Scout for scout-kit) and runs unit + e2e; no reusable module CI framework
 
 ### File ownership
 
@@ -101,14 +101,14 @@ Success means: new modules and engineer-in-test waves can follow one documented 
 | design | Plan/contract refinements in hub only (if still needed) | Product code under `modules/**` |
 | dev | `docs/module-testing.md`, pointer edits in `docs/module-verification.md`, `docs/module-ci.md`, `AGENTS.md`, `README.md`, `modules/README.md`, `CONSUMER_CONTEXT.md` (docs only) | Module test implementations; workflow YAML beyond doc cross-links |
 | test | `modules/xq-scout-kit/tests/**`, `modules/xq-scout-kit/tsr/**`, `modules/xq-scout-kit/testbed/**`, `modules/xq-ios-act-cli/**/Tests/**`, `modules/xq-ios-act-cli/scripts/**`, `modules/xq-ios-act-cli/tsr/**`, module README testing sections — **incl. e2e scripts/cases** | Root CI framework; unrelated feature freelancing |
-| devops | `.github/workflows/ci-xq-scout-kit.yml`, `.github/workflows/ci-xq-ios-act-cli.yml` — wire unit + e2e (or skip-with-reason); `docs/module-ci.md` evidence notes | Shared reusable workflow |
+| devops | `.github/workflows/ci-xq-scout-kit.yml`, `.github/workflows/ci-xq-ios-act-cli.yml` — **wire unit + e2e so Actions runs e2e**; runner prerequisites; `docs/module-ci.md` evidence notes | Shared reusable workflow; “skip e2e in Actions” as done |
 
 ### Acceptance
 
 - [ ] Testing contract merged on the feature branch and linked from verification + CI docs
 - [ ] Audit notes: scout-kit vs ios-act-cli vs **unit + e2e** bar
-- [ ] Gap fixes landed under test ownership **or** explicit README waiver per gap
-- [ ] Snap commands below green (e2e skip-with-reason allowed only if documented as blocked)
+- [ ] Gap fixes landed under test ownership (e2e in-module) + devops (Actions runs them)
+- [ ] Snap commands below green **and** Actions e2e jobs green on the feature branch
 - [ ] No new root runner / reusable module CI / matrix
 
 ### Snap commands
@@ -119,12 +119,17 @@ cd checkouts/xq-versastacks   # or checkouts/xq-versastack if that is the synced
 test -f docs/module-testing.md
 rg -n 'module-testing|functional|e2e' docs/module-testing.md docs/module-verification.md docs/module-ci.md
 
-# Unit (always)
+# Unit
 cd modules/xq-scout-kit && bash tests/run-all.sh && test -s tsr/summary.md && test -s tsr/junit.xml
 cd ../xq-ios-act-cli && bash scripts/run-swift.sh && test -s tsr/summary.md
 
-# E2E — exact commands to be named in each module README by the wave
-# (ios-act: Simulator + DeviceKit path; scout: documented real-Scout / e2e command)
+# E2E — exact module README commands (wave must name + implement these); also must pass in Actions
+# ios-act: Simulator + DeviceKit e2e script (to be added under modules/xq-ios-act-cli/scripts/)
+# scout: documented real-Scout / e2e command already owned by the module
+
+# Prove Actions runs e2e (after push to feat/versastacks-test-best-practices):
+#   gh run list -R chauhaidang/xq-versastacks --branch feat/versastacks-test-best-practices
+#   # ios-act and scout-kit workflows show e2e job success (not skipped)
 ```
 
 ## Work packages
@@ -140,8 +145,8 @@ cd ../xq-ios-act-cli && bash scripts/run-swift.sh && test -s tsr/summary.md
 | Role | Engineer | Package | Ownership |
 | --- | --- | --- | --- |
 | dev | `engineer-in-dev` | WP1 — `docs/module-testing.md` stating functional=e2e + pointers | docs + root markdown pointers |
-| test | `engineer-in-test` | WP2 — audit unit+e2e; add ios-act Simulator/DeviceKit e2e (or waive); align scout TSR naming; TSR | module tests / e2e scripts / tsr / README testing sections |
-| devops | `engineer-in-devops` | WP3 — CI runs unit + e2e (or honest skip); runner prerequisites | per-module workflow YAML + `docs/module-ci.md` |
+| test | `engineer-in-test` | WP2 — audit unit+e2e; add ios-act Simulator/DeviceKit e2e scripts; align scout e2e + TSR naming | module tests / e2e scripts / tsr / README testing sections |
+| devops | `engineer-in-devops` | WP3 — **Actions must run e2e** (unit + e2e jobs); install sim/DeviceKit/Scout prerequisites on runners | per-module workflow YAML + `docs/module-ci.md` |
 
 ### After snap
 
@@ -152,6 +157,7 @@ cd ../xq-ios-act-cli && bash scripts/run-swift.sh && test -s tsr/summary.md
 ## Notes / decisions
 
 - **Required bar (locked):** **unit + functional**, with **functional = e2e** (clarified 2026-07-30). Earlier “functional = CLI against fakes” interpretation is **withdrawn**.
+- **Actions runs e2e (locked 2026-07-30):** GitHub Actions must execute e2e for each shipped module’s path-scoped workflow — not local-only, not skip-as-green.
 - **Simulator is enough** for ios-act e2e unless the module README explicitly requires device.
 - **Independence invariant:** each module owns CI/CD and its e2e command/runtime. Best practices are a **contract document**, not a shared implementation.
 - **Hub checkout name:** `org/links.yaml` uses `xq-versastacks`; some machines still have `checkouts/xq-versastack` remoted to that repo — snap commands accept either path.
