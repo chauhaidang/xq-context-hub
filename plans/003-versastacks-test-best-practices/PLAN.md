@@ -3,7 +3,7 @@
 - **ID**: `003-versastacks-test-best-practices`
 - **Hub issue**: https://github.com/chauhaidang/xq-context-hub/issues/12
 - **Domains**: harness (`domains/harness/CONTEXT.md`) — `xq-versastacks` only
-- **Status**: ready
+- **Status**: in_progress — WP0 **waived**; parallel wave started on `feat/versastacks-test-best-practices`
 
 ## Goal
 
@@ -138,7 +138,7 @@ cd ../xq-ios-act-cli && bash scripts/run-swift.sh && test -s tsr/summary.md
 
 - **Role**: design
 - **Engineer**: `engineer-in-design`
-- **Done when**: Work Contract above is complete enough for the parallel wave. **Waive WP0** if root accepts this plan as-is; spawn design only if e2e runtime choices (sim vs device, CI hosting) are disputed.
+- **Done when**: Work Contract above is complete enough for the parallel wave. **WP0 waived 2026-07-30** — root accepted plan; wave started.
 
 ### Parallel wave — same branch (`feat/versastacks-test-best-practices`)
 
